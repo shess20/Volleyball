@@ -1,0 +1,359 @@
+---
+title: "analysis"
+output: html_document
+date: "2023-05-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stringr)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(mosaic)
+library(xtable)
+library(pscl) 
+library(multcomp)
+library(pander)
+library(MASS)
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(factoextra) 
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+library(dendextend) # for comparing two dendrograms
+```
+
+## Read in and manipulate data for use
+```{r}
+
+boxscores <- read_csv("boxscoresFINAL.csv") 
+boxscores <- boxscores %>%
+  group_by(Date, Site,set) %>%
+  mutate(point_diff = points[1] - points[2],
+         winner = if_else(point_diff > 0, School[1], School[2]),
+         setwon = if_else(winner == School, TRUE, FALSE)
+         )%>%
+  group_by(Date,Site)%>%
+  mutate(matchwin = winner[max(set)])%>%
+  mutate(School = str_remove_all(School, pattern = "\r\n"))
+  
+boxscores <- boxscores %>%
+  group_by(Date, Site,set) %>%
+  mutate(point_diff = points[1] - points[2],
+         winner = if_else(point_diff > 0, School[1], School[2]),
+         setwon = if_else(winner == School, TRUE, FALSE)
+         )%>%
+  group_by(Date,Site, url)%>%
+  mutate(matchwin = winner[max(set)])%>%
+  mutate(School = str_remove_all(School, pattern = "\r\n"))%>%
+  mutate(School = if_else(School =="Rochester (NY)", "RIT", School))%>%
+  mutate(School = if_else(str_detect(School, "Ithaca"), "Ithaca", School))%>%
+  mutate(School = if_else(str_detect(School, "Clark"), "Clarkson", School))%>%
+  mutate(School = if_else(str_detect(School, "Vassar"), "Vassar", School))%>%
+  mutate(School = if_else((str_detect(School, "Bard") | School == "BARD"), "Bard", School))%>%
+  mutate(School = if_else((str_detect(School, "Union") | School == "UNION"), "Union", School))
+
+matches <- boxscores %>%
+  group_by(School, url)%>%
+  slice(n=1) %>%
+  dplyr::select(School, h_a, Date,Time,Site,Attendance,url,matchwin)%>%
+  pivot_wider(names_from = h_a, values_from = School)%>%
+  relocate(Home, Away, matchwin)%>%
+  rename(home = "Home") %>%
+  mutate(homewin = if_else(matchwin == home, TRUE, FALSE))
+
+play_by_play <- read_csv("play_by_playFINAL.csv") %>%
+  dplyr::select(-3)%>%
+  filter(!is.na(home_team_score))
+
+individual_stats <- read_csv("individualsNEW.csv")
+
+
+ps <- read_csv("per_set_statsNEW.csv")
+
+comma <- individual_stats %>%
+  filter(str_detect(player, ","))%>%
+  mutate(player = str_replace_all(player, ",", " "))%>%
+  mutate(player = str_replace_all(player, "  ", " "))%>%
+  mutate(player = str_replace_all(player, "  ", " ")) %>%
+  separate(col = player, into = c("last_name", "first_name"), sep = " ")
+  
+nocomma <- individual_stats %>%
+  filter(!str_detect(player, ","))%>%
+  mutate(player = str_replace_all(player, "  ", " "))%>%
+  mutate(player = str_replace_all(player, "  ", " ")) %>%
+  separate(col = player, into = c("first_name", "last_name"), sep = " ")
+
+individual_stats <- full_join(comma, nocomma)%>%
+  mutate(first_name = if_else((first_name == "Sam"), "Samantha", first_name))%>%
+  mutate(first_name = if_else((first_name == "Reaga"), "Reagan", first_name))%>%
+  mutate(first_name = if_else((last_name == "Spaethling"), "Ella", first_name))%>%
+  mutate(first_name = if_else((first_name == "Pinero"), "Renee", first_name))%>%
+  mutate(last_name = if_else((last_name == "Depencier"), "Depencier Pinero", last_name))
+names(individual_stats) = tolower(names(individual_stats))
+
+
+individual_stats2 <- individual_stats %>%
+  filter(sp >= 3) %>%
+  dplyr::select(1:19)%>%
+  dplyr::select(-13)%>%
+  group_by(last_name, first_name)%>%
+  summarise(across(2:16, ~ sum(., na.rm=TRUE))) %>%
+  filter(sp >= 37)
+
+
+```
+
+## play by play chart
+```{r}
+
+playbyplaychart <- play_by_play %>%
+  filter(home_team_score <= 25)%>%
+  mutate(point_gap = home_team_score - visiting_team_score,
+         team1_points_until_25 = (25 - home_team_score)) 
+
+playbyplaychart <- left_join(playbyplaychart, matches %>% dplyr::select(url, homewin), by = "url")
+
+playbyplaychart <- playbyplaychart %>%
+  group_by(point_gap, team1_points_until_25)%>%
+  dplyr::summarise(winrate = mean(homewin) * 100,
+            n=n())
+
+ggplot(playbyplaychart %>% filter(n >= 3), aes(team1_points_until_25,point_gap ))+geom_raster(aes(fill=winrate))+scale_fill_gradient2(low="red", high="blue", mid="white", midpoint = 50)+scale_x_reverse(breaks = c(25,20,15,10,5,0))+geom_hline(yintercept=0)+xlab("Points until 25 (Team 1)")+ylab("Point Gap (T1 - T2)")+labs(title = "Win Rate of Team 1 at a Point Gap throughout a Set", fill = "win rate")+theme(aspect.ratio = 1, legend.position = "bottom")
+
+```
+
+
+
+
+
+
+## regression
+
+```{r}
+box <- boxscores %>%
+  mutate(matchwon = if_else(School == matchwin, TRUE, FALSE))%>%
+  group_by(School, url)%>%
+  slice(n=1)%>%
+  mutate(h_a = tolower(h_a))
+
+sum <- individual_stats %>%
+  group_by(team, url) %>%
+  summarise(across(where(is.numeric), ~ sum(., na.rm=TRUE)))
+
+statbox <- full_join(sum, box, by = c("team" = "h_a", "url"))%>%
+  group_by(School)%>%
+  mutate(matchwon = if_else(matchwon == TRUE, 1, 0))
+
+statbox_season <- full_join(sum, box, by = c("team" = "h_a", "url"))%>%
+  group_by(School)%>%
+  mutate(matchwon = if_else(matchwon == TRUE, 1, 0))%>%
+  summarise(across(where(is.numeric), ~ sum(., na.rm=TRUE)))
+
+statbox_ll <- statbox_season %>%
+  filter(matchwon > 3)
+
+## test poisson model
+LLpoisson_mod <- glm(matchwon ~ k + e + ta + a + sa + se +dig + bs + ba, family = poisson, data = statbox_ll)
+summary(LLpoisson_mod)
+LLpoisson_mod %>%
+  broom::tidy() %>%
+  select(term, p.value, estimate)%>%
+  rename("statistic" = term )%>%
+  rename("pvalue" = "p.value")%>%
+  relocate(estimate)%>%
+  relocate(statistic)%>%
+  mutate(estimate = round(estimate, digits = 3),
+         "pvalue" = round(`pvalue`, digits = 5))%>%
+  mutate(`pvalue` = if_else(pvalue <= 0.001, paste(pvalue, "****"), if_else(pvalue <= 0.01, paste(pvalue, "***"), if_else(pvalue <= 0.05, paste(pvalue, "**"), if_else(pvalue <= 0.1, paste(pvalue, "*"), as.character(pvalue))))))%>%
+  mutate(pvalue = if_else(pvalue == "0 ****", "0.000 ****", pvalue))%>%
+  knitr::kable(caption = "Poisson Model on Volleyball Statistics' effects on # of Matches Won",padding =2, table.attr='cellpadding="50px"')%>%kableExtra::kable_classic(full_width = F, html_font = "Cambria")%>%
+kableExtra::footnote(general = "*  < 0.1 \n ** < .05 \n *** < .01 \n **** < .001")
+
+
+## final model
+
+statbox <- statbox %>%
+   rename("kills" = "k")%>%
+  rename("errors" = "e")%>%
+  rename("total_attempts" = "ta")%>%
+  rename("assists" = "a")%>%
+  rename("serve_aces" = "sa")%>%
+  rename("serve_errors" = "se")%>%
+  rename("solo_blocks" = "bs")%>%
+  rename("block_assists" = "ba")
+
+binwin <- glm(matchwon ~ kills + errors + total_attempts + assists + serve_aces + serve_errors +dig + solo_blocks + block_assists, family = binomial, data = statbox)
+binwin %>%
+  broom::tidy()%>%
+  select(-std.error)%>%
+  rename("test statistic" = statistic)%>%
+  rename("volleyball stat" = term )%>%
+  rename("pvalue" = "p.value")%>%
+  relocate(estimate)%>%
+  relocate(`volleyball stat`)%>%
+  mutate(estimate = round(estimate, digits = 3),
+                               pvalue = round(pvalue, digits = 3),
+         `test statistic` = round(`test statistic`, digits = 3))%>%
+  mutate(pvalue = if_else(pvalue == 0.000, " < .001", as.character(pvalue))) %>%
+  knitr::kable(caption = "Logistic Regression on Volleyball Statistics' effect on Winning a Match",padding =2, table.attr='cellpadding="50px"')%>%kableExtra::kable_classic(full_width = F, html_font = "Cambria") 
+summary(binwin)
+
+```
+
+
+
+
+### cluster analysis
+
+```{r}
+
+## Initial clusters on Individual data
+just_num <- individual_stats2 %>%
+  ungroup()%>%
+  dplyr::select(-1)%>%
+  dplyr::select(-1) %>%
+  dplyr::select(-sp)
+results <- prcomp(just_num, scale = TRUE)
+
+#reverse the signs
+results$rotation <- -1*results$rotation
+
+#display principal components
+results$rotation
+
+biplot(results, scale = 0)
+
+
+scaled <- scale(just_num)
+
+distance = dist(scaled)
+
+
+library(dendextend)
+mydata.hclust = hclust(distance)
+hcd=as.dendrogram(mydata.hclust)
+hcd = color_branches(hcd, k=7) %>% set("labels", c(""))
+plot(hcd, horiz = TRUE )
+rect.hclust(mydata.hclust, k=7, border = 5)
+
+
+
+
+member = cutree(mydata.hclust,7)
+# attach membership, cut orgiinal data set and run hclust on just the big cluster 1 and then just 2
+## then cut where i need and piece bacl together.
+table(member)
+member
+just_num$member =  member
+
+## Subcluster #1
+
+member1_prescale <- just_num %>%
+  filter(member == 1)
+member1 <- just_num %>%
+  filter(member == 1)
+
+scaledm1 <- scale(member1)
+
+distancem1 = dist(scaledm1)
+
+mydata.hclustm1 = hclust(distancem1)
+plot(mydata.hclustm1)
+hcd2=as.dendrogram(mydata.hclustm1)
+hcd2 = color_branches(hcd2, k=7) %>% set("labels", c(""))
+plot(hcd2, horiz = TRUE )
+rect.hclust(mydata.hclustm1, k=7)
+
+memberm1cut = cutree(mydata.hclustm1,7)
+
+# attach membership, cut orgiinal data set and run hclust on just the big cluster 1 and then just 2
+## then cut where i need and piece bacl together.
+table(memberm1cut)
+
+member1_prescale$member = memberm1cut+10
+
+## subcluster # 2
+
+member2 <- just_num %>%
+  filter(member == 3)
+
+scaledm2 <- scale(member2)
+
+distancem2 = dist(scaledm2)
+
+mydata.hclustm2 = hclust(distancem2)
+plot(mydata.hclustm2)
+hcd3=as.dendrogram(mydata.hclustm2)
+hcd3 = color_branches(hcd3, k=2) %>% set("labels", c(""))
+plot(hcd3, horiz = TRUE )
+rect.hclust(mydata.hclustm2, k=2)
+
+
+memberm2cut = cutree(mydata.hclustm2,2)
+# attach membership, cut orgiinal data set and run hclust on just the big cluster 1 and then just 2
+## then cut where i need and piece bacl together.
+table(memberm2cut)
+
+member2$member <- memberm2cut+20
+
+
+## Paste back together
+
+nom1or2 <- just_num %>%
+  filter(member != 1& member != 3)
+all_together <- bind_rows(nom1or2, member1_prescale)%>%
+  bind_rows(., member2)
+
+
+table(all_together$member)
+
+
+all_together <- all_together %>% 
+  group_by(member)
+nomember <- all_together %>%
+  ungroup()%>%
+  select(-member)
+
+
+aggregate(scaled,list(member),mean)
+
+aggregate(all_together,list(member),mean)
+
+
+
+scaledall <- scale(nomember)
+
+scaledall2 <- bind_cols(scaledall, member=all_together$member)
+
+
+## Create Heat Map 
+heat_9 <- scaledall2 %>%
+  group_by(member)%>%
+  summarise(across(everything(),mean))%>%
+  ungroup()%>%
+  select(-member) %>%
+  as.data.frame()%>%
+  relocate(dig, a)
+  
+
+heat_9[which(heat_9 > 3, arr.ind = TRUE)] = 3
+
+  
+clust_colors <- data.frame(cluster = as.numeric(as.factor(scaledall2$member)))
+
+
+pheatmap(heat_9,  cluster_rows = FALSE, fontsize =
+           13)
+```
+
+
+
+
+
+
+
+

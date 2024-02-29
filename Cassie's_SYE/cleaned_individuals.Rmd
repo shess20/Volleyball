@@ -1,0 +1,172 @@
+---
+title: "cleaned_individuals"
+output: html_document
+date: "2022-10-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## This file gets the individual player statistics from all matches played
+
+# Packages required
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(janitor)
+library(RCurl)
+library(httr)
+library(XML)
+library(lubridate)
+```
+
+
+# 3 functions to scrape the information, clean and format it, and save it to a file
+## scrape fxn
+## Pass in a url, and this function will scrape the necessary tables and store them
+
+```{r}
+
+## urll given
+## scrape into table
+scrape_url <- function(url){
+  
+  data <- read_html(url)
+  
+  info_vals <- data %>% html_node(xpath="/html/body/form/main/article/div[2]/section[1]/header/div/dl") %>% html_text()
+  datafram2 <- data_frame(do.call("rbind", strsplit(as.character(info_vals), ":\r\n       ", fixed = TRUE)))
+  col1 <- datafram2[[1]][,1]
+  col2<- datafram2[[1]][,2]
+  col3<-datafram2[[1]][,3]
+  col4 <- datafram2[[1]][,4]
+  col5<- datafram2[[1]][,5]
+  vals2 <- matrix(c(col1,col2,col3,col4,col5),ncol=5,byrow=TRUE)
+  tbl <- data.frame(vals2)
+  match_info <-tbl %>% separate(col = (2), into =c("Date", "timeheader"), sep = "                        ")%>%
+    separate(col = 4, into = c("Time", "siteheader"), sep = "                        ")%>%
+    separate(col = "X4", into = c("Site", "attendanceheader"), sep = "                        ")%>%
+    rename("Attendance"= "X5")%>%
+    select(-c(1,3,5,7))%>%
+    mutate(Attendance = parse_number(Attendance),Time = parse_time(Time),
+           Date = mdy(Date), url = url)
+
+## string extract and split to pull data
+
+  temp <- data %>% html_nodes("table")
+  objs <- temp %>% html_table() %>% append(list(match_info))
+  
+  return(objs)
+  
+  ## tables to be cleaned
+  
+  box_score <- objs[[1]]
+  per_set_stats <- objs[[2]]
+  
+  individual_stats_home <- objs[[6]]
+  individual_stats_away <- objs[[8]]
+  
+  play_by_play_s1 <- objs[[10]]
+  play_by_play_s2 <- objs[[11]]
+  play_by_play_s3 <- objs[[12]]
+  play_by_play_s4 <- objs[[13]]
+  play_by_play_s5 <- objs[[14]]
+  
+}
+
+```
+
+
+## clean fxn
+## Pulls the tables that contain individual's stats from 
+## the object that was scraped
+## cleans the data and formats into the table we want
+## returns table of stats
+
+```{r}
+## takes in the scraped objstables from naz
+## list of tables to be cleaned and then
+## this will output a list of those
+
+clean_individuals <- function(tables){
+  
+  ## tables to be cleaned
+  match_info <- tables[[length(tables)]]
+  
+  # individual stat, good
+  individual_stats_home <- tables[[6]] %>%
+    row_to_names(row =1) %>%
+    clean_names()%>%
+    mutate(team = "home")
+  individual_stats_away <- tables[[8]]%>%
+    row_to_names(row =1)%>%
+    clean_names()%>%
+    mutate(team = "away")
+
+  individual_stat <- bind_rows(individual_stats_home,individual_stats_away )%>%
+    mutate(
+           number = parse_number(number))%>%
+    filter(!is.na(number))%>%
+    separate(col = player, into = c('none', 'player'), sep = '                                        ')%>%
+    dplyr::select(-('none'))%>%
+    merge(match_info)%>%
+    clean_names()
+    
+  return(list(
+    individual_stats = individual_stat  ))
+
+
+}
+
+# good, returns list of tables cleaned
+```
+
+
+## save fxn
+## takes in the table and saves it
+## appends to the existing csv each time and keeps the names after the first input
+
+```{r}
+
+##clean$name
+## try to clean headers so they arent col names
+save_individuals <- function(cleaned, set_the_names){
+  write_csv(file = 'individualsNEW.csv', cleaned$individual_stats,col_names = set_the_names, append=TRUE)
+}
+
+
+```
+
+
+## loops urls
+## takes the input of match urls
+## loops through each match url and get the individual data through scrape and clean fxn, and saves it to file
+
+
+```{r, warning=FALSE}
+complete_url_list <- scan("complete_url_list_ALL.txt", what = "character")
+##url = "https://clarksonathletics.com/boxscore.aspx?id=7969&path=vball"
+##testsc<- scrape_url(url)
+##testci <- clean_individuals(testsc)
+##look <- testci$individual_stats
+##save <- save_individuals(testci, FALSE)
+
+for (u in complete_url_list){
+  if (url.exists(u) == TRUE){
+    ## scraped takes url, outputs obj tables
+    scraped <- scrape_url(u)
+    ## clean tkakes scraped obj table and outputs list of cleaned
+    cleaned <- clean_individuals(scraped)
+    ## takes list of cleaned tables
+    keep_names = FALSE
+    if (u == complete_url_list[1]){
+      keep_names = TRUE
+    }
+    save_individuals(cleaned, keep_names)
+    
+  }
+}
+```
+

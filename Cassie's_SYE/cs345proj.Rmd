@@ -1,0 +1,310 @@
+---
+title: "cs345proj"
+output: html_document
+date: "2022-11-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Organize the Data
+```{r}
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(stringr)
+boxscores <- read_csv("boxscoresNEW.csv") 
+boxscores <- boxscores %>%
+  group_by(Date, Site,set) %>%
+  mutate(point_diff = points[1] - points[2],
+         winner = if_else(point_diff > 0, School[1], School[2]),
+         setwon = if_else(winner == School, TRUE, FALSE)
+         )%>%
+  group_by(Date,Site)%>%
+  mutate(matchwin = winner[max(set)])%>%
+  mutate(School = str_remove_all(School, pattern = "\r\n"))%>%
+  mutate(School = if_else(School =="Rochester (NY)", "RIT", School))%>%
+  mutate(School = if_else(str_detect(School, "Ithaca"), "Ithaca", School))%>%
+  mutate(School = if_else(str_detect(School, "Clark"), "Clarkson", School))%>%
+  mutate(School = if_else(str_detect(School, "Vassar"), "Vassar", School))%>%
+  mutate(School = if_else((str_detect(School, "Bard") | School == "BARD"), "Bard", School))%>%
+  mutate(School = if_else((str_detect(School, "Union") | School == "UNION"), "Union", School))
+
+  
+
+```
+
+## liberty_league_teams.csv has final records and teams
+
+## Matches Final
+```{r}
+matches <- boxscores %>%
+  group_by(School, url)%>%
+  slice(n=1) %>%
+  select(School, h_a, Date,Time,Site,Attendance,url,matchwin)%>%
+  pivot_wider(names_from = h_a, values_from = School)%>%
+  relocate(Home, Away, matchwin)%>%
+  rename(home = "Home")
+names(matches) = tolower(names(matches))
+matches %>%
+  write_csv(.,file = "matches.csv", na = "")
+```
+
+
+```{r}
+individuals <- read_csv("individualsNEW.csv")%>%
+  select(-date,-attendance,-time,-site)%>%
+  rename( h_a = team)
+
+box <- boxscores %>%
+  group_by(School, url)%>%
+  slice(n=1)
+box$h_a = tolower(box$h_a)
+```
+
+## Players and Player Stats final
+
+```{r}
+playerstats <- left_join(individuals,box, by = c("url", "h_a")) %>%
+  select(-set,-Attendance,-Date,-Time, -Site)%>%
+  relocate(School)%>%
+  select(-(23:28))%>%
+  select(-10, -13)%>%
+  mutate(School = if_else(str_detect(School, "Union") | str_detect(School, 'UNION'), "Union", School))%>%mutate(School = if_else(str_detect(School, "Vassar"), "Vassar", School))
+
+library(tidyr)
+comma <- playerstats %>%
+  filter(str_detect(player, ","))%>%
+  mutate(player = str_replace_all(player, ",", " "))%>%
+  mutate(player = str_replace_all(player, "  ", " "))%>%
+  mutate(player = str_replace_all(player, "  ", " ")) %>%
+  separate(col = player, into = c("last_name", "first_name"), sep = " ")
+  
+nocomma <- playerstats %>%
+  filter(!str_detect(player, ","))%>%
+  mutate(player = str_replace_all(player, "  ", " "))%>%
+  mutate(player = str_replace_all(player, "  ", " ")) %>%
+  separate(col = player, into = c("first_name", "last_name"), sep = " ")
+
+playerstats <- full_join(comma, nocomma)%>%
+  mutate(first_name = if_else((first_name == "Sam"), "Samantha", first_name))%>%
+  mutate(first_name = if_else((first_name == "Reaga"), "Reagan", first_name))%>%
+  mutate(first_name = if_else((last_name == "Spaethling"), "Ella", first_name))%>%
+  mutate(first_name = if_else((first_name == "Pinero"), "Renee", first_name))%>%
+  mutate(last_name = if_else((last_name == "Depencier"), "Depencier Pinero", last_name))%>%
+    filter(!is.na(School))
+names(playerstats) = tolower(names(playerstats))
+
+playerstats%>%
+  write_csv(.,file = "playerstats.csv")
+
+
+players <- playerstats %>%select(last_name,first_name, number, School) %>%
+  mutate(first_name = if_else((first_name == "Pinero"), "Renee", first_name))%>%
+  group_by(last_name,number,School) %>%
+  slice(n=1)%>%
+  filter(!is.na(School))
+names(players) = tolower(names(players))
+players %>%
+  write_csv(.,file = "players.csv")
+
+```
+
+## set -- add in points
+
+```{r}
+boxscores <- boxscores %>%
+  group_by(Date, Site,set) %>%
+  mutate(point_diff = points[1] - points[2],
+         winner = if_else(point_diff > 0, School[1], School[2]),
+         setwon = if_else(winner == School, TRUE, FALSE)
+         )%>%
+  group_by(Date,Site)%>%
+  mutate(matchwin = winner[max(set)])%>%
+  mutate(School = str_remove_all(School, pattern = "\r\n"))
+  
+
+per_set_stats2 <- read_csv("per_set_stats.csv")%>%
+  mutate(Set = substring(Set, 6, 6),
+         Set= parse_integer(Set))%>%
+  rename("School" = team)%>%
+  rename("set" = "Set")
+
+set_box4 <- full_join(boxscores, per_set_stats, by = c("Date", "set", "School", "Time", "Site", "url", "Attendance"))%>%
+  rename("set_winner" = "winner")
+
+set <- set_box4 %>%
+  ungroup()%>%
+  select(-setwon, -matchwin, -Date, -Time, -Attendance, -Site,-h_a)%>%
+  select(-2)%>%
+  filter(url != "https://saintsathletics.com/sports/womens-volleyball/stats/2021/suny-canton/boxscore/22689")%>%
+  mutate(School = if_else(School =="Rochester (NY)", "UofR", School))%>%
+  mutate(School = if_else(str_detect(School, "Ithaca"), "Ithaca", School))%>%
+  mutate(School = if_else(str_detect(School, "Clark"), "Clarkson", School))%>%
+  mutate(School = if_else(str_detect(School, "Vassar"), "Vassar", School))%>%
+  mutate(School = if_else((str_detect(School, "Bard") | School == "BARD"), "Bard", School))%>%
+  mutate(School = if_else((str_detect(School, "Union") | School == "UNION"), "Union", School))
+
+names(set) = tolower(names(set))
+set%>%
+  write_csv(.,file="sets.csv", na = "")
+
+
+
+
+persetstats<-read_csv("per_set_statsNEW.csv")%>%
+  mutate(Set = substring(Set, 6, 6))%>%
+  rename(set = Set)%>%
+  mutate(set = parse_integer(set))%>%
+  rename(School = team)
+
+persetstats<- left_join(persetstats, boxscores, by = c("url", "set", "School", "Date", "Time","Site", "Attendance")) %>%
+  select(-Date, -Attendance,-Site, -Time)%>%
+  select(-8,-9,-(11:14))%>%
+  relocate(points)%>%
+  relocate(set)%>%
+  relocate(School)%>%
+  rename(pct = "%")%>%
+  write_csv(.,"set.csv")
+
+
+schools <- boxscores %>%
+  select(School)%>%
+  group_by(School)%>%
+  slice(n=1)%>%
+  select(School)%>%
+  write_csv(.,"schools.csv")
+
+teams<- libleague_teams %>%
+  mutate(league = "LibertyLeague")
+
+teams <- full_join(teams, schools, by = "School") %>%
+  mutate(year = 2021) 
+
+names(teams) = tolower(names(teams))
+teams %>%
+  write_csv(.,file = "teams.csv", na = "")
+```
+# Analyze the data
+
+## Attendance Home/Away points
+```{r}
+## attendance for home vs awy effecting kills, 
+
+## matches and sets
+
+graph <- full_join(matches, set, by = "url")%>%group_by(set)
+
+library(ggplot2)
+ggplot(data =graph %>% filter(school == home) %>% filter(set == 3), mapping =aes(x=attendance, y=points, group = set))+geom_point()+geom_smooth(method="lm", se = FALSE)
+
+ggplot(data =graph %>% filter(school == home), mapping =aes(x=attendance, y=points, group = set))+geom_point()+geom_smooth(method="lm", se = FALSE)
+
+
+lm <- lm(points ~ attendance , data = graph %>%filter(school == home) %>% group_by(set) )
+summary(lm)
+
+away <- lm(points ~ attendance*set, data = graph %>%filter(school == away) )
+summary(away)
+
+ggplot(data =graph %>% filter(school == away), mapping =aes(x=attendance, y=points, group = set))+geom_point()+geom_smooth(method="lm", se = FALSE)
+
+```
+
+
+## Kills over time
+```{r}
+graph2 <- full_join(matches, playerstats, by= "url")
+library(ggplot2)
+
+piper<-graph2 %>% filter(last_name == "Piper")
+piperm<-lm(k ~ Date, piper)
+summary(piperm)
+ggplot(data = graph2 %>% filter(last_name == "Piper"), mapping = aes(x=Date, y =k))+geom_point()+geom_smooth(method="lm", se = FALSE) 
+
+Ehnstrom<-graph2 %>% filter(last_name == "Ehnstrom")
+Ehnstrom<-lm(k ~ Date, Ehnstrom)
+summary(Ehnstrom)
+ggplot(data = graph2 %>% filter(last_name == "Ehnstrom"), mapping = aes(x=Date, y =k))+geom_point()+geom_smooth(method="lm", se = FALSE) 
+
+
+
+```
+
+## Aces and Total points 
+```{r}
+aces <- playerstats %>%
+  group_by(url, school)%>%
+  summarise(aces = sum(sa))
+
+points <- set %>%
+  group_by(url, school)%>%
+  summarise(points = sum(points))
+
+reg <- left_join(aces, points, by = c("url","school"))
+
+mod <- lm(points ~ aces, reg)
+summary(mod)
+
+ggplot(data = reg, aes(y=points, x=aces))+geom_point()+geom_smooth(method="lm", se=FALSE)
+
+
+
+```
+
+# serve errors 
+```{r}
+serr <- playerstats %>%
+  group_by(url, school)%>%
+  summarise(serro = sum(se))
+
+points <- set %>%
+  group_by(url, school)%>%
+  summarise(points = sum(points))
+
+reg <- left_join(serr, points, by = c("url","school"))
+
+mod <- lm(points ~ serro, reg)
+summary(mod)
+
+ggplot(data = reg, aes(y=points, x=serro))+geom_point()+geom_smooth(method="lm", se=FALSE)
+
+```
+
+## aces and erros with whether they won or loss game 
+## and with total points
+## aces and chance you score after
+
+# poisson season level
+  ## win to aces +kills+blocks
+  ## model to predict wins with each additional whatever with over season 
+  poison models count data like distribution
+  
+  
+
+## Multiple Regression
+```{r}
+all <- playerstats %>%
+  group_by(url, school)%>%
+  summarise(se = sum(se),
+            a = sum(a),
+            e = sum(e),
+            k = sum(k),
+            sa = sum(sa),
+            digs = sum(dig))
+
+points <- set %>%
+  group_by(url, school)%>%
+  summarise(points = sum(points))
+
+reg <- left_join(all, points, by = c("url","school"))
+
+mod <- lm(points ~ sa+se+a+e+digs+k, reg)
+summary(mod)
+
+ggplot(data = reg, aes(y=points, x=serro))+geom_point()+geom_smooth(method="lm", se=FALSE)
+
+```
+
+```

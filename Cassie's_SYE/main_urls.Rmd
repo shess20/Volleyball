@@ -1,0 +1,118 @@
+---
+title: "main_urls"
+output: html_document
+date: "2022-10-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Packages Required
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(janitor)
+library(RCurl)
+library(httr)
+library(XML)
+library(lubridate)
+```
+
+
+
+## passes in the list of Liberty League schools (Clarkson, Ithaca, William Smith, Union, RIT, Vassar, Bard, Skidmore, St. Lawrence) and returns name of school and url and list of urls
+
+## change year within this function for different years (could be turned into a loop in future work)
+## run for each and appends match urls for that year
+```{r}
+
+get_first_google_link <- function(name, root = TRUE) {
+  ## change year within here (2013-2022)
+  url = URLencode(paste0("https://www.google.com/search?q= women's volleyball 2022 stats",name))
+  page <- xml2::read_html(url)
+  # extract all links
+  nodes <- rvest::html_nodes(page, "a")
+  links <- rvest::html_attr(nodes,"href")
+  # extract first link of the search results
+  link <- links[startsWith(links, "/url?q=")][1]
+  # clean it
+  link <- sub("^/url\\?q\\=(.*?)\\&sa.*$","\\1", link)
+  # get root if relevant
+  if(root) link <- sub("^(https?://.*?/).*$", "\\1", link)
+  links
+  link
+}
+
+## Schools list to be run through above function
+schools <- data.frame(school = c("Clarkson","Ithaca", "William Smith", "Union", "RIT", 'Vassar', "Bard", 'Skidmore', "St. Lawrence"))
+
+## attach school name and url to get each schools main stats page 
+schools <- transform(schools, url = sapply(school,get_first_google_link))%>%
+  mutate(main_urls = paste0(url, "sports/womens-volleyball/stats/2022"),
+         url = substring(url, 0, nchar(url) -1))
+main_urls <- schools$main_urls
+base_urls <- schools$url
+
+```
+
+
+
+## takes the list of schools home page URL and outputs All Match URLS
+## Created a complete url for each match for every school
+```{r}
+
+## now, main url = url from list then do rest
+get_complete_match_urls <- function (main_url, base_url) {
+  
+  main_url<- main_url
+  url_list <- main_url %>% read_html() %>%
+    html_nodes("table")%>% html_nodes("tr") %>%html_node("a") %>% html_attr("href") #as above
+  
+  url_list
+  all_match_urls <- unique(url_list[!is.na(url_list)])
+  all_match_urls <- all_match_urls[-1]
+  
+  base_url <- base_url
+  complete_urls <- paste(base_url, all_match_urls, sep = "")
+  return(complete_urls)
+}
+```
+
+
+
+## Puts all match urls into a file
+##  ONLY RUN ONCE !!!!!
+## had to go in and manually change the order of the txt file for the first school to have available play by play data
+```{r}
+complete_url_list <- list()
+for (mu in main_urls) {
+  ## get complete urls for each
+  base_url <- substring(mu, 0, nchar(mu) - 36 )
+  complete_urls_inner <- get_complete_match_urls(mu, base_url)
+  complete_url_list <- append(complete_url_list, complete_urls_inner)
+}
+
+complete_url_list<- unique(complete_url_list)
+write(unlist(complete_url_list), file = "complete_url_list_ALL.txt", ncolumns =1)
+```
+
+
+
+
+
+## This scrapedthe liberty league website for all teams and their records for 2021 season
+## used in database project
+```{r}
+llteams <- "https://libertyleagueathletics.com/standings.aspx?standings=168"
+
+sv<- read_html(llteams)%>%html_nodes("table")
+objs <- sv %>% html_table() 
+libleague_teams <- objs[[1]] %>%
+  select(1, 3, 6)%>%
+  separate(col =Overall, into = c("Overall_Wins", "Overall_Losses"), sep = "-")%>%
+  separate(col =Conf, into = c("Conf_Wins", "Conf_Losses"), sep = "-")%>%
+  mutate(year = 2021)
+write_csv(libleague_teams, file = "liberty_league_teams.csv")
+```

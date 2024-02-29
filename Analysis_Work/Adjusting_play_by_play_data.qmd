@@ -1,0 +1,19 @@
+---
+title: "Adjusting the Data"
+format: html
+editor: visual
+---
+
+```{r}
+library(readr)
+
+# reading in Cassie's data
+playByPlay <- read.csv("data/play_by_playFINAL3.csv")
+boxscores <-  read.csv("data/boxscoresFINAL.csv")
+perSet <- read.csv("data/per_set_statsNew.csv")
+
+
+
+newPlayByPlay<- playByPlay%>%
+  mutate(if_else(score))
+```

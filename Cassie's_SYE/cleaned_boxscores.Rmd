@@ -1,0 +1,131 @@
+---
+title: "cleaned_boxscores"
+output: html_document
+date: "2022-11-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Packages
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(janitor)
+library(RCurl)
+library(httr)
+library(XML)
+library(lubridate)
+```
+
+
+
+
+## scrape fxn
+
+
+```{r}
+
+## url given
+## scrape into table
+scrape_url <- function(url){
+  data <- read_html(url)
+  info_vals <- data %>% html_node(xpath="/html/body/form/main/article/div[2]/section[1]/header/div/dl") %>% html_text()
+  datafram2 <- data_frame(do.call("rbind", strsplit(as.character(info_vals), ":\r\n       ", fixed = TRUE)))
+  col1 <- datafram2[[1]][,1]
+  col2<- datafram2[[1]][,2]
+  col3<-datafram2[[1]][,3]
+  col4 <- datafram2[[1]][,4]
+  col5<- datafram2[[1]][,5]
+  vals2 <- matrix(c(col1,col2,col3,col4,col5),ncol=5,byrow=TRUE)
+  tbl <- data.frame(vals2)
+  match_info <-tbl %>% separate(col = (2), into =c("Date", "timeheader"), sep = "                        ")%>%
+    separate(col = 4, into = c("Time", "siteheader"), sep = "                        ")%>%
+    separate(col = "X4", into = c("Site", "attendanceheader"), sep = "                        ")%>%
+    rename("Attendance"= "X5")%>%
+    dplyr::select(-c(1,3,5,7))%>%
+    mutate(Attendance = parse_number(Attendance),Time = parse_time(Time),
+           Date = mdy(Date), url = url)
+
+## string extract and split to pull data
+  temp <- data %>% html_nodes("table")
+  objs <- temp %>% html_table() %>% append(list(match_info))
+  objs[[1]][["Team"]] = str_remove_all(objs[[1]][["Team"]], "Winner\r\n                                            \r\n                                            ")
+  return(objs)
+  
+  ## tables to be cleaned
+  objs[[1]][["Team"]] = str_remove_all(objs[[1]][["Team"]], "Winner\r\n                                            \r\n                                            ")
+  box_score <- objs[[1]]
+  per_set_stats <- objs[[2]]
+  
+  individual_stats_home <- objs[[6]]
+  individual_stats_away <- objs[[8]]
+  
+  play_by_play_s1 <- objs[[10]]
+  play_by_play_s2 <- objs[[11]]
+  play_by_play_s3 <- objs[[12]]
+  play_by_play_s4 <- objs[[13]]
+  play_by_play_s5 <- objs[[14]]
+}
+
+```
+
+## clean fxn
+## takes in scraped object tables
+## takes out the boxscores and formats how we want it
+
+```{r}
+clean_boxscore <- function(tables){
+   ## tables to be cleaned
+  match_info <- tables[[length(tables)]]
+  ## box score, good
+  box_score <- tables[[1]] %>%
+    mutate(h_a = c("Home", "Away")) %>%
+    pivot_longer(., (2:(ncol(.)-1)),  names_to = "set", values_to = "points") %>%
+    merge(match_info)%>%
+    separate(1, into = c("School", "Abbrev. Name"), sep = -10)
+}
+```
+
+
+## save fxn
+## takes in the table and saves it
+## appends to the existing csv each time and keeps the names after the first input
+
+
+```{r}
+##clean$name
+## try to clean headers so they arent col names
+save_boxscores <- function(cleaned, set_the_names){
+  write_csv(file = 'boxscoresFINAL.csv',x= cleaned,col_names = set_the_names, append=TRUE)
+}
+
+```
+
+
+
+## loops urls
+## through all of the complete match urls
+## scrapes, cleans then saves the nice table
+
+```{r, warning=FALSE}
+complete_url_list <- scan("complete_url_list_ALL.txt", what = "character")
+
+for (u in complete_url_list){
+  print(u)
+  if (url.exists(u) == TRUE){
+    ## scraped takes url, outputs obj tables
+    scraped <- scrape_url(u)
+    ## clean tkakes scraped obj table and outputs list of cleaned
+    cleaned <- clean_boxscore(scraped)
+    ## takes list of cleaned tables
+    keep_names = FALSE
+    if (u == complete_url_list[1]){
+      keep_names = TRUE
+    }
+    save_boxscores(cleaned, keep_names)
+  }
+}
+```

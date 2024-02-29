@@ -1,0 +1,262 @@
+---
+title: "cleaned_play_by_play"
+output: html_document
+date: "2022-11-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Packages
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(janitor)
+library(RCurl)
+library(httr)
+library(XML)
+library(lubridate)
+library(readr)
+```
+
+
+
+
+## scrape fxn
+
+
+```{r}
+
+## urll given
+## scrape into table
+scrape_url <- function(url){
+  
+  data <- read_html(url)
+  
+  info_vals <- data %>% html_node(xpath="/html/body/form/main/article/div[2]/section[1]/header/div/dl") %>% html_text()
+  datafram2 <- data_frame(do.call("rbind", strsplit(as.character(info_vals), ":\r\n       ", fixed = TRUE)))
+  col1 <- datafram2[[1]][,1]
+  col2<- datafram2[[1]][,2]
+  col3<-datafram2[[1]][,3]
+  col4 <- datafram2[[1]][,4]
+  col5<- datafram2[[1]][,5]
+  vals2 <- matrix(c(col1,col2,col3,col4,col5),ncol=5,byrow=TRUE)
+  tbl <- data.frame(vals2)
+  match_info <-tbl %>% separate(col = (2), into =c("Date", "timeheader"), sep = "                        ")%>%
+    separate(col = 4, into = c("Time", "siteheader"), sep = "                        ")%>%
+    separate(col = "X4", into = c("Site", "attendanceheader"), sep = "                        ")%>%
+    rename("Attendance"= "X5")%>%
+    dplyr::select(-c(1,3,5,7))%>%
+    mutate(Attendance = parse_number(Attendance),Time = parse_time(Time),
+           Date = mdy(Date), url = url)
+
+## string extract and split to pull data
+
+  temp <- data %>% html_nodes("table")
+  objs <- temp %>% html_table() %>% append(list(match_info))
+  
+  return(objs)
+  
+  ## tables to be cleaned
+  
+  box_score <- objs[[1]]
+  per_set_stats <- objs[[2]]
+  
+  individual_stats_home <- objs[[6]]
+  individual_stats_away <- objs[[8]]
+  
+  play_by_play_s1 <- objs[[10]]
+  play_by_play_s2 <- objs[[11]]
+  play_by_play_s3 <- objs[[12]]
+  play_by_play_s4 <- objs[[13]]
+  play_by_play_s5 <- objs[[14]]
+  
+}
+
+```
+
+## clean fxn
+```{r}
+clean_playbyplay <- function(tables){
+  
+  match_info <- tables[[length(tables)]]
+  
+  head <- c("serve_team","score","play_descripton", "home_play_description","home_team_score", "visiting_team_score","visiting_play_description", "set")
+  
+
+  length <- length(tables)
+  if (length >= 13){
+      play_by_play_s1 <- tables[[10]] %>%
+          mutate(set = 1)
+      if (is.character(play_by_play_s1$`Visiting Team Score`)){
+        play_by_play_s1 <- play_by_play_s1 %>%
+          mutate("Visiting Team Score" = parse_integer(play_by_play_s1$"Visiting Team Score"))%>%
+          mutate("Home Team Score" = parse_integer(play_by_play_s1$"Home Team Score"))
+      }
+      play_by_play_s2 <- tables[[11]]%>%
+        mutate(set = 2)
+      if (is.character(play_by_play_s2$`Visiting Team Score`)){
+        play_by_play_s2 <- play_by_play_s2 %>%
+          mutate("Visiting Team Score" = parse_integer(play_by_play_s2$"Visiting Team Score"))%>%
+          mutate("Home Team Score" = parse_integer(play_by_play_s2$"Home Team Score"))
+      }
+      play_by_play_s3 <- tables[[12]]%>%
+        mutate(set = 3)
+      if (is.character(play_by_play_s3$`Visiting Team Score`)){
+        play_by_play_s3 <- play_by_play_s3 %>%
+          mutate("Visiting Team Score" = parse_integer(play_by_play_s3$"Visiting Team Score"))%>%
+          mutate("Home Team Score" = parse_integer(play_by_play_s3$"Home Team Score"))
+      }
+      
+      play_by_play_s1 <- play_by_play_s1 %>% 
+        mutate(`Serve Team` = as.character(`Serve Team`),
+               `Score` = as.character(`Score`),
+               `Play Description` = as.character(`Play Description`))
+      
+      play_by_play_s2 <- play_by_play_s2  %>% 
+        mutate(`Serve Team` = as.character(`Serve Team`),
+               `Score` = as.character(`Score`),
+               `Play Description` = as.character(`Play Description`))
+      play_by_play_s3 <- play_by_play_s3 %>%
+        mutate(`Serve Team` = as.character(`Serve Team`),
+               `Score` = as.character(`Score`),
+               `Play Description` = as.character(`Play Description`))
+      
+
+        
+      
+
+      if (length == 13){
+        
+          full_play_by_play <- bind_rows(play_by_play_s1, play_by_play_s2 )%>%
+            bind_rows(.,play_by_play_s3)%>%
+            dplyr::select(-3, -7)
+          
+        }  
+      if (length==14){
+          play_by_play_s4 <- tables[[13]] %>%
+            mutate(set = 4)
+          if (is.character(play_by_play_s4$`Visiting Team Score`)){
+            play_by_play_s4 <- play_by_play_s4 %>%
+              mutate("Visiting Team Score" = parse_integer(play_by_play_s4$"Visiting Team Score"))%>%
+              mutate("Home Team Score" = parse_integer(play_by_play_s4$"Home Team Score"))
+          }  
+          
+          play_by_play_s4 <- play_by_play_s4 %>%
+            mutate(`Serve Team` = as.character(`Serve Team`),
+               `Score` = as.character(`Score`),
+               `Play Description` = as.character(`Play Description`))
+            
+          full_play_by_play <- bind_rows(play_by_play_s1, play_by_play_s2 )%>%
+            bind_rows(.,play_by_play_s3)%>%
+            bind_rows(.,play_by_play_s4)%>%
+            dplyr::select(-3, -7)
+          
+        } 
+      if (length == 15){
+          play_by_play_s4 <- tables[[13]] %>%
+            mutate(set = 4)
+          if (is.character(play_by_play_s4$`Visiting Team Score`)){
+            play_by_play_s4 <- play_by_play_s4 %>%
+              mutate("Visiting Team Score" = parse_integer(play_by_play_s4$"Visiting Team Score"))%>%
+              mutate("Home Team Score" = parse_integer(play_by_play_s4$"Home Team Score"))
+          }  
+          play_by_play5 <- tables[[14]] %>%
+            mutate(set = 5)
+        if (is.character(play_by_play5$`Visiting Team Score`)){
+          play_by_play5 <- play_by_play5 %>%
+            mutate("Visiting Team Score" = parse_integer(play_by_play5$"Visiting Team Score"))%>%
+            mutate("Home Team Score" = parse_integer(play_by_play5$"Home Team Score"))
+        }
+          play_by_play_s4 <- play_by_play_s4 %>%
+            mutate(`Serve Team` = as.character(`Serve Team`),
+               `Score` = as.character(`Score`),
+               `Play Description` = as.character(`Play Description`))
+          play_by_play5 <- play_by_play5 %>%
+            mutate(`Serve Team` = as.character(`Serve Team`),
+               `Score` = as.character(`Score`),
+               `Play Description` = as.character(`Play Description`)
+               )
+          full_play_by_play <- bind_rows(play_by_play_s1, play_by_play_s2 )%>%
+            bind_rows(.,play_by_play_s3)%>%
+            bind_rows(.,play_by_play_s4)%>%
+            bind_rows(., play_by_play5) %>%
+            dplyr::select(-3, -7)
+         
+      }
+      
+    }
+      
+  if (length < 13){
+        full_play_by_play = data.frame(serve_team=character(0),score=character(0),play_description=character(0),home_play_description=character(0),home_team_score = integer(0), visiting_team_score = integer(0), visiting_play_description=character(0), set=integer(0))
+    }
+      
+  colnames(full_play_by_play) <- head
+          
+      full_play_by_play <- full_play_by_play %>%
+        merge(match_info)
+      
+  
+  
+    ## 4 sets, 14 total tables
+    ## 5 sets 15 total tables
+    ##play_by_play_s5 <- tables[[14]]
+
+}
+
+
+
+ full_play_by_play = data.frame(serve_team=character(0),score=character(0),visiting_play_description=character(0),visiting_team_score = integer(0), home_team_score = integer(0), home_play_description=character(0)) %>%
+   merge(test[[length(test)]])
+```
+
+
+
+## save fxn
+
+```{r}
+
+##clean$name
+## try to clean headers so they arent col names
+save_playbyplay <- function(cleaned, set_the_names){
+  
+  write_csv(file = 'play_by_playFINAL.csv', cleaned,col_names = set_the_names, append=TRUE)
+}
+
+```
+
+
+
+## loops urls
+
+```{r, warning=FALSE}
+complete_url_list <- scan("complete_url_list_ALL.txt", what = "character")
+copy <- scan("CopyOfcomplete_url_list_ALL.txt", what = "character")
+list <- list("https://gopeacepacers.com/boxscore.aspx?id=2733&path=wvball",
+"https://gopeacepacers.com/boxscore.aspx?id=2736&path=wvball",
+"https://gopeacepacers.com/boxscore.aspx?id=2737&path=wvball")
+complete_url_list[1110]
+for (u in complete_url_list){
+  print(u)
+  if (url.exists(u) == TRUE){
+    ## scraped takes url, outputs obj tables
+    scraped <- scrape_url(u)
+    ## clean tkakes scraped obj table and outputs list of cleaned
+    cleaned <- clean_playbyplay(scraped)
+    ## takes list of cleaned tables
+    keep_names = FALSE
+    if (u == complete_url_list[1]){
+      keep_names = TRUE
+    }
+    save_playbyplay(cleaned, keep_names)
+    
+  }
+}
+
+library(readr)
+
+play_by_playNEW <- read_csv("play_by_playNEW.csv")
+
+```
