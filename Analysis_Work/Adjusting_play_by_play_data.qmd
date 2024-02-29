@@ -6,14 +6,48 @@ editor: visual
 
 ```{r}
 library(readr)
+library(tidyverse)
+library(dplyr)
+library(magrittr)
 
 # reading in Cassie's data
 playByPlay <- read.csv("data/play_by_playFINAL3.csv")
 boxscores <-  read.csv("data/boxscoresFINAL.csv")
 perSet <- read.csv("data/per_set_statsNew.csv")
 
+```
+
+p(s\|madebias) \<- made given that previous was made
+
+1 - p(s\|madebias) \<- missed given that previous was made
+
+p(s\|missedbias) \<- made given that previous was missed
+
+1 - p(s\|missedbias) \<- missed given that previous was missed
+
+p(s\|N) \<- made given neutral
+
+1 - p(s\|N) \<- missed given neutral
+
+```{r}
+library(dplyr)
+
+# Check the structure of your data frame
+str(playByPlay)
+
+# Assuming playByPlay has columns like Date, set, serve_team, score, home_team_score, visiting_team_score, play_description
+
+newPlayByPlay <- playByPlay %>%
+  filter(serve_team %in% c("SLU", "Union"), Date == "2013-11-08", set == 1) %>%
+  mutate(play_number = row_number(),
+         home_team_scored = ifelse(home_team_score - lag(home_team_score, default = first(home_team_score)) > 0, TRUE, FALSE),
+         ace = ifelse(c("Ace","ace") %in% play_descripton, TRUE, FALSE),
+         kill = ifelse(c("Kill","kill") %in% play_descripton, TRUE, FALSE),
+         error = ifelse(c("Error", "error") %in% play_descripton, TRUE, FALSE))
+
+# View the resulting data frame
+print(newPlayByPlay)
 
 
-newPlayByPlay<- playByPlay%>%
-  mutate(if_else(score))
+
 ```
