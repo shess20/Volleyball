@@ -22,7 +22,11 @@ perSet <- read.csv("data/per_set_statsNew.csv")
 newPlayByPlay <- playByPlay %>%
   mutate(ace = grepl("ace", play_descripton, ignore.case = TRUE),
          error = grepl("error", play_descripton, ignore.case = TRUE),
-         kill = grepl("kill", play_descripton, ignore.case = TRUE))
+         kill = grepl("kill", play_descripton, ignore.case = TRUE),
+         timeout = grepl("timeout", play_descripton, ignore.case = TRUE),
+         subs = grepl("subs", play_descripton, ignore.case = TRUE))
+#newPlayByPlay <- playByPlay %>%
+  #filter(timeout != TRUE)
 
 # Convert 'ace', 'error', and 'kill' columns to binary indicators (1 if true, 0 if false)
 newPlayByPlay$ace_indicator <- as.numeric(newPlayByPlay$ace)
@@ -64,11 +68,6 @@ newPlayByPlay <- newPlayByPlay %>%
 ```
 
 ```{r}
-adjusted_data <- newPlayByPlay %>% 
-  select(point_scored, prev_point_scored, set, Date, Site, point_scored_by)
-```
-
-```{r}
 newPlayByPlay <- newPlayByPlay %>%
   mutate(point_scored = case_when(
      ace_indicator == 1 ~ 'ace',
@@ -82,8 +81,13 @@ newPlayByPlay <- newPlayByPlay %>%
 ```
 
 ```{r}
+adjusted_data <- newPlayByPlay %>% 
+  select(point_scored, prev_point_scored, set, Date, Site, point_scored_by)
+```
+
+```{r}
 adjusted_data <- adjusted_data %>%
-  group_by(point_scored, prev_point_scored) %>%
+  group_by(point_scored, prev_point_scored, Date, Site, set) %>%
   tally()
 ```
 
@@ -101,21 +105,20 @@ adjusted_data <- adjusted_data %>%
 ```
 
 ```{r}
-loglik <- function(x, a.abias, a.ebias, a.obias, a.neutral, a.)
-{ # x is a vector containing the parameter values
-  ps.n = x[1]  # pb.n is the first entry of x
-  ps.sbias = x[2] # pb.bbias is the second entry of x
-  ps.mbias = x[3] # pb.gbias is the third entry of x
-  loglik = ns.n*log(ps.n) + nm.n*log(1-ps.n) + # contributions from neutral fams
-    ns.sbias*log(ps.sbias) + nm.sbias*log(1-ps.sbias) + # contrib from bbias 
-    ns.mbias*log(ps.mbias) + nm.mbias*log(1-ps.mbias)   # contrib from gbias
-  return(-loglik) # optim is a minimization function (so need to give is negative log likelihood)
+loglik <- function(x, na.abias, a.abias, na.nabias, a.nabias, a.n, na.n)
+{ps.n = x[1]  
+  ps.abias = x[2] 
+  ps.nabias = x[3] 
+  loglik = na.n*log(ps.n) + na.n*log(1-ps.n) + 
+    ns.sbias*log(ps.sbias) + nm.sbias*log(1-ps.sbias) + 
+    ns.mbias*log(ps.mbias) + nm.mbias*log(1-ps.mbias)   
+  return(-loglik) 
 }
 
+# optim is a minimization function (so need to give is negative log likelihood)
 optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
-      loglik.mod2,ns.n = 25, nm.n = 33,
-      ns.sbias = 66, nm.sbias = 101,
-      ns.mbias = 99, nm.mbias = 132, 
+      loglik.mod2,ns.n = 29, nm.n = 29,
+      ns.sbias = 197, nm.sbias = 246,
+      ns.mbias = 244, nm.mbias = 223, 
       method="BFGS")
-
 ```
