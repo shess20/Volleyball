@@ -17,6 +17,20 @@ perSet <- read.csv("data/per_set_statsNew.csv")
 
 ```
 
+```{r}
+# Create new columns ace, error, and kill
+newPlayByPlay <- playByPlay %>%
+  mutate(ace = grepl("ace", play_descripton, ignore.case = TRUE),
+         error = grepl("error", play_descripton, ignore.case = TRUE),
+         kill = grepl("kill", play_descripton, ignore.case = TRUE))
+
+# Convert 'ace', 'error', and 'kill' columns to binary indicators (1 if true, 0 if false)
+newPlayByPlay$ace_indicator <- as.numeric(newPlayByPlay$ace)
+newPlayByPlay$error_indicator <- as.numeric(newPlayByPlay$error)
+newPlayByPlay$kill_indicator <- as.numeric(newPlayByPlay$kill)
+
+```
+
 p(s\|madebias) \<- made given that previous was made
 
 1 - p(s\|madebias) \<- missed given that previous was made
@@ -30,24 +44,78 @@ p(s\|N) \<- made given neutral
 1 - p(s\|N) \<- missed given neutral
 
 ```{r}
-library(dplyr)
-
-# Check the structure of your data frame
-str(playByPlay)
-
-# Assuming playByPlay has columns like Date, set, serve_team, score, home_team_score, visiting_team_score, play_description
-
-newPlayByPlay <- playByPlay %>%
-  filter(serve_team %in% c("SLU", "Union"), Date == "2013-11-08", set == 1) %>%
-  mutate(play_number = row_number(),
-         home_team_scored = ifelse(home_team_score - lag(home_team_score, default = first(home_team_score)) > 0, TRUE, FALSE),
-         ace = ifelse(c("Ace","ace") %in% play_descripton, TRUE, FALSE),
-         kill = ifelse(c("Kill","kill") %in% play_descripton, TRUE, FALSE),
-         error = ifelse(c("Error", "error") %in% play_descripton, TRUE, FALSE))
-
-# View the resulting data frame
-print(newPlayByPlay)
+# Add new columns to the existing data
+newPlayByPlay <- newPlayByPlay %>%
+  arrange(set, Date, Time) %>%  # Sort the data for correct order
+  group_by(set, Date, Site) %>%
+  mutate(
+    play = row_number(),
+    previous_score_home = lag(home_team_score, default = first(home_team_score)),
+    previous_score_visiting = lag(visiting_team_score, default = first(visiting_team_score)),
+    point_scored_by = case_when(
+      home_team_score > previous_score_home ~ 'Home Team',
+      visiting_team_score > previous_score_visiting ~ 'Visiting Team',
+      TRUE ~ 'No Point'
+    )
+  )
 
 
+
+```
+
+```{r}
+adjusted_data <- newPlayByPlay %>% 
+  select(point_scored, prev_point_scored, set, Date, Site, point_scored_by)
+```
+
+```{r}
+newPlayByPlay <- newPlayByPlay %>%
+  mutate(point_scored = case_when(
+     ace_indicator == 1 ~ 'ace',
+     error_indicator == 1 ~ 'error',
+     kill_indicator == 1  ~ 'other'
+    )
+  )
+
+newPlayByPlay <- newPlayByPlay %>%
+  mutate(prev_point_scored = lag(point_scored, default = first(point_scored)))
+```
+
+```{r}
+adjusted_data <- adjusted_data %>%
+  group_by(point_scored, prev_point_scored) %>%
+  tally()
+```
+
+```{r}
+#adjusted_data <- adjusted_data %>% 
+ # mutate(count = case_when(
+    #prev_point_scored == "ace" & point_scored == "ace" ~ 'a.ace', 
+    #prev_point_scored == "ace" & point_scored != "ace" ~ 'na.ace',
+    #prev_point_scored == "na" & point_scored == "ace" ~ 'a.neutral', 
+    #prev_point_scored == "na" & point_scored != "ace" ~ 'na.neutral', 
+    #prev_point_scored != "ace" & point_scored == "ace" ~ 'a.noace', 
+    #prev_point_scored != "ace" & point_scored != "ace" ~ 'na.noace'
+  #))
+
+```
+
+```{r}
+loglik <- function(x, a.abias, a.ebias, a.obias, a.neutral, a.)
+{ # x is a vector containing the parameter values
+  ps.n = x[1]  # pb.n is the first entry of x
+  ps.sbias = x[2] # pb.bbias is the second entry of x
+  ps.mbias = x[3] # pb.gbias is the third entry of x
+  loglik = ns.n*log(ps.n) + nm.n*log(1-ps.n) + # contributions from neutral fams
+    ns.sbias*log(ps.sbias) + nm.sbias*log(1-ps.sbias) + # contrib from bbias 
+    ns.mbias*log(ps.mbias) + nm.mbias*log(1-ps.mbias)   # contrib from gbias
+  return(-loglik) # optim is a minimization function (so need to give is negative log likelihood)
+}
+
+optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
+      loglik.mod2,ns.n = 25, nm.n = 33,
+      ns.sbias = 66, nm.sbias = 101,
+      ns.mbias = 99, nm.mbias = 132, 
+      method="BFGS")
 
 ```
