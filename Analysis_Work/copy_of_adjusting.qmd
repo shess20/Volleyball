@@ -1,5 +1,5 @@
 ---
-title: "Adjusting the Data"
+title: "Adjusting the Data (Copy)"
 format: html
 editor: visual
 ---
@@ -110,7 +110,7 @@ loglik <- function(x, a.abias, na.abias, a.ebias, na.ebias, a.obias, na.obias, e
   return(-loglik) # optim is a minimization function (so need to give is negative log likelihood)
 }
 
-optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
+result <- optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
       loglik,
       a.abias = sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "ace"))$n),
       na.abias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "ace"))$n),
@@ -132,8 +132,11 @@ optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
       no.obias = sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "other"))$n),
       method="BFGS")
 
-```
 
+# Extract the estimated parameters
+estimated_params <- result
+
+```
 
 ```{r, warning=FALSE}
 loglik <- function(x, a.abias, a.obias, na.abias, na.obias)
@@ -146,7 +149,7 @@ loglik <- function(x, a.abias, a.obias, na.abias, na.obias)
   return(-loglik) # optim is a minimization function (so need to give is negative log likelihood)
 }
 
-adjusted_data2 <- adjusted_data1 %>%
+adjusted_data2 <- adjusted_data %>%
   mutate(prev_point_scored = case_when(
     prev_point_scored == "error" ~ "other",
     TRUE ~ prev_point_scored
@@ -161,7 +164,7 @@ optim(par = c(.5,.5),
 
 ```
 
-```{r}
+```{r, warning=FALSE}
 loglik <- function(x, e.ebias, e.obias, ne.ebias, ne.obias)
 { # x is a vector containing the parameter values
   ps.obias = x[1]  # the first entry of x
@@ -172,13 +175,13 @@ loglik <- function(x, e.ebias, e.obias, ne.ebias, ne.obias)
   return(-loglik) # optim is a minimization function (so need to give is negative log likelihood)
 }
 
-adjusted_data2 <- adjusted_data1 %>%
+adjusted_data2 <- adjusted_data %>%
   mutate(prev_point_scored = case_when(
     prev_point_scored == "ace" ~ "other",
     TRUE ~ prev_point_scored
   ))
 
-optim(par = c(.5, .5), 
+a <- optim(par = c(.5, .5), 
       loglik, e.ebias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "error"))$n),
       ne.ebias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "error"))$n),
       e.obias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "other"))$n),
@@ -187,3 +190,59 @@ optim(par = c(.5, .5),
 
 ```
 
+```{r}
+# Hypothesis testing between the models
+# Assuming log-likelihood values for Model1 and Model2 are stored as loglik1 and loglik2
+loglik0 <- -35979.94
+loglik1 <- -80497.31
+
+# Calculate the likelihood ratio statistic
+likelihood_ratio_stat <- -2 * (loglik0 - loglik1)
+
+# Set the degrees of freedom (df) as the difference in the number of parameters between the two models
+df <- 0# Set the appropriate value based on the difference in parameters
+
+# Calculate the p-value using the chi-square distribution
+p_value <- pchisq(likelihood_ratio_stat, df, lower.tail = FALSE)
+
+# Set the significance level
+alpha <- 0.05
+
+# Compare p-value with significance level
+if (p_value < alpha) {
+  cat("Reject the null hypothesis. There is a significant difference between the two models.\n")
+} else {
+  cat("Fail to reject the null hypothesis. There is no significant difference between the two models.\n")
+}
+
+```
+
+```{r}
+# Hypothesis testing between the models
+# Assuming log-likelihood values for Model1 and Model2 are stored as loglik1 and loglik2
+loglik0 <- -35979.94
+loglik1 <- -80497.31
+
+# Calculate the likelihood ratio statistic
+likelihood_ratio_stat <- -2 * (loglik0 - loglik1)
+
+# Set the degrees of freedom (df) as the difference in the number of parameters between the two models
+df <- 0# Set the appropriate value based on the difference in parameters
+
+# Calculate the p-value using the chi-square distribution
+p_value <- pchisq(likelihood_ratio_stat, df, lower.tail = FALSE)
+
+# Set the significance level
+alpha <- 0.05
+
+# Compare p-value with significance level
+if (p_value < alpha) {
+  cat("Reject the null hypothesis. There is a significant difference between the two models.\n")
+} else {
+  cat("Fail to reject the null hypothesis. There is no significant difference between the two models.\n")
+}
+```
+
+```{r}
+
+```

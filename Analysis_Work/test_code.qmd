@@ -1,107 +1,79 @@
 ---
-title: "Untitled"
+title: "Hypothesis Testing"
 format: html
 editor: visual
 ---
+
 ```{r}
-# Create new columns ace, error, and kill
-newPlayByPlay <- playByPlay %>%
-  mutate(ace = grepl("ace", play_descripton, ignore.case = TRUE),
-         error = grepl("error", play_descripton, ignore.case = TRUE),
-         kill = grepl("kill", play_descripton, ignore.case = TRUE))
+# Extract the estimated parameters
+estimated_params <- coef(result)
 
-# Convert 'ace', 'error', and 'kill' columns to binary indicators (1 if true, 0 if false)
-newPlayByPlay$ace_indicator <- as.numeric(newPlayByPlay$ace)
-newPlayByPlay$error_indicator <- as.numeric(newPlayByPlay$error)
-newPlayByPlay$kill_indicator <- as.numeric(newPlayByPlay$kill)
+# Calculate the z-value
+z_value <- (estimated_params[2] - 0.5) / standard_errors[2]
 
-# Add new columns to the existing data
-newPlayByPlay <- newPlayByPlay %>%
-  arrange(set, Date, Site) %>%  # Sort the data for correct order
-  group_by(set, Date, Site) %>%
-  mutate(
-    play = row_number(),
-    previous_score_home = lag(home_team_score),
-    previous_score_visiting = lag(visiting_team_score),
-    point_scored_by = case_when(
-      play == 1 ~ NA_character_,
-      home_team_score > previous_score_home ~ 'Home Team',
-      visiting_team_score > previous_score_visiting ~ 'Visiting Team',
-      TRUE ~ 'No Point'
-    )
-  )
-newPlayByPlay <- newPlayByPlay %>%
-  mutate(point_scored = case_when(
-     ace_indicator == 1 ~ 'ace',
-     error_indicator == 1 ~ 'error',
-     kill_indicator == 1  ~ 'other'
-    )
-  )
+# Calculate the two-tailed p-value
+p_value <- 2 * pnorm(-abs(z_value))
 
-newPlayByPlay <- newPlayByPlay %>%
-  mutate(prev_point_scored = lag(point_scored, default = first(point_scored)))
+# Set the significance level (e.g., 0.05)
+alpha <- 0.05
 
-# Extract relevant columns
-adjusted_data <- newPlayByPlay %>%
-  filter(!is.na(point_scored_by)) %>%
-  select(point_scored, set, Date, Site, point_scored_by)
-
-# Group by relevant columns and tally occurrences
-adjusted_data <- adjusted_data %>%
-  group_by(point_scored_by, point_scored) %>%
-  tally()
-
-# Rename columns for clarity
-adjusted_data <- adjusted_data %>%
-  rename(
-    prev_point_scored = point_scored_by,
-    count = n
-  )
-
-# Remove unnecessary columns
-adjusted_data <- adjusted_data %>%
-  select(prev_point_scored, point_scored, count)
-
-loglik <- function(x, a.abias, na.abias, a.ebias, na.ebias, a.obias, na.obias, e.abias, ne.abias, e.ebias, ne.ebias, e.obias, ne.obias, o.abias, no.abias, o.ebias, no.ebias, o.obias, no.obias)
-{ # x is a vector containing the parameter values
-  ps.obias = x[1]  # pb.n is the first entry of x
-  ps.abias = x[2] # pb.bbias is the second entry of x
-  ps.ebias = x[3] # pb.gbias is the third entry of x'
-  
-  loglik = a.abias*log(ps.abias)+na.abias*log(1-ps.abias) + 
-    e.abias*log(ps.abias) + ne.abias*log(1-ps.abias) + 
-    o.abias*log(ps.abias) + no.abias*log(1-ps.abias) + 
-    a.ebias*log(ps.ebias)+na.ebias*log(1-ps.ebias) + 
-    e.ebias*log(ps.ebias) + ne.ebias*log(1-ps.ebias) + 
-    o.ebias*log(ps.ebias) + no.ebias*log(1-ps.ebias) + 
-    a.obias*log(ps.obias)+na.obias*log(1-ps.obias) + 
-    e.obias*log(ps.obias) + ne.abias*log(1-ps.obias) + 
-    o.obias*log(ps.obias) + no.ebias*log(1-ps.obias)
-  
-  return(-loglik) # optim is a minimization function (so need to give is negative log likelihood)
+# Compare p-value to the significance level
+if (p_value < alpha) {
+  cat("Reject the null hypothesis. There is evidence that the bias for aces in the next point, given the previous point was an ace, is different from 0.5.")
+} else {
+  cat("Fail to reject the null hypothesis. There is not enough evidence to suggest a difference in the bias for aces in the next point, given the previous point was an ace.")
 }
 
-optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
-      loglik,
-      a.abias = (adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "ace"))$n,
-      na.abias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "ace"))$n),
-      e.abias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "ace"))$n),
-      ne.abias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "ace"))$n),
-      no.abias = sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "ace"))$n),
-      o.abias = sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "ace"))$n),
-      a.ebias = sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "error"))$n),
-      na.ebias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "error"))$n),
-      e.ebias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "error"))$n),
-      ne.ebias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "error"))$n),
-      o.ebias = sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "error"))$n),
-      no.ebias = sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "error"))$n),
-      a.obias = sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "other"))$n),
-      na.obias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "other"))$n),
-      e.obias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "other"))$n),
-      ne.obias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "other"))$n),
-      o.obias = sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "other"))$n),
-      no.obias = sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "other"))$n),
-      method="BFGS")
+# Print z-value and p-value
+cat("\nZ-value:", z_value, "\nP-value:", p_value)
 
 ```
+
+```{r}
+
+# Ho: there is a significant difference between the two models
+# Ha: there is no significant difference in the two models
+
+# Hypothesis testing between the models
+loglik0 <- -35979.94
+loglik1 <- -80497.31
+
+# Calculate the likelihood ratio statistic
+likelihood_ratio_stat <- -2 * (loglik0 - loglik1)
+
+
+df <- 0
+
+# Calculate the p-value using the chi-square distribution
+p_value <- pchisq(likelihood_ratio_stat, df, lower.tail = FALSE)
+
+x <- 0.05
+
+
+if (p_value < x) {
+  cat("Reject the null hypothesis. There is a significant difference between the two models.\n")
+} else {
+  cat("Fail to reject the null hypothesis. There is no significant difference between the two models.\n")
+}
+
+```
+
+Neither the ace or error model is significantly better than the other.
+
+```{r}
+loglik <- as.double(80497)
+lr_test <- -2 * sum(loglik - logLik(null_model))  # Likelihood ratio statistic
+df <- length(mles)  # Degrees of freedom
+p_value <- pchisq(lr_test, df, lower.tail = FALSE)
+```
+
+```{r}
+# summary(mod4) |> names() # check names in summary object
+
+ts_lof <- summary(mod4)$deviance # lack of fit test statistic
+df_lof <- summary(mod4)$df.residual # df lack of fit test 
+
+pval_lof <- pchisq(ts_lof, df_lof, lower.tail = FALSE)
+
+pval_lof
 ```
