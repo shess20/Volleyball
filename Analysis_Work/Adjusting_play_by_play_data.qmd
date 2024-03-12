@@ -20,6 +20,7 @@ perSet <- read.csv("data/per_set_statsNew.csv")
 ```{r}
 # Create new columns ace, error, and kill
 newPlayByPlay <- playByPlay %>%
+  group_by(set, Date, Site) %>%
   mutate(ace = grepl("ace", play_descripton, ignore.case = TRUE),
          error = grepl("error", play_descripton, ignore.case = TRUE),
          kill = grepl("kill", play_descripton, ignore.case = TRUE))
@@ -54,28 +55,43 @@ newPlayByPlay <- newPlayByPlay %>%
 ```
 
 ```{r}
+
 newPlayByPlay <- newPlayByPlay %>%
   mutate(point_scored = case_when(
      ace_indicator == 1 ~ 'ace',
      error_indicator == 1 ~ 'error',
      kill_indicator == 1  ~ 'other'
-    )
+    ),
+    prev_point_scored = lag(point_scored, default = NA)
   )
 
-newPlayByPlay <- newPlayByPlay %>%
-  mutate(prev_point_scored = lag(point_scored, default = first(point_scored)))
-```
-
-```{r}
 adjusted_data <- newPlayByPlay %>% 
-  select(point_scored, prev_point_scored, set, Date, Site, point_scored_by)
-```
-
-```{r}
-adjusted_data <- adjusted_data %>%
-  group_by(point_scored, prev_point_scored) %>%
-  
+  select(point_scored, prev_point_scored, set, Date, Site, point_scored_by) %>%
+  group_by(point_scored, prev_point_scored, set, Date, Site) %>%
   tally()
+
+# Check if adjusted_data has any rows
+if (nrow(adjusted_data) > 0) {
+  adjusted_data1 <- adjusted_data %>%
+    filter(Date == grepl("2013-08-30", Date, ignore.case = TRUE) & 
+           Site == grepl("Center Valley", Site, ignore.case = TRUE))
+
+  # Continue with the optimization only if adjusted_data1 has rows
+  if (nrow(adjusted_data1) > 0) {
+    # Your remaining code for optim...
+    optim(par = c(.5, .5, .5),
+          loglik,
+          a.abias = (adjusted_data1 %>% filter(point_scored == "ace" & prev_point_scored == "ace"))$n,
+          na.abias = sum((adjusted_data1 %>% filter(point_scored != "ace" & prev_point_scored == "ace"))$n),
+          # ... other parameters ...
+          method = "BFGS")
+  } else {
+    print("No data matching the filtering conditions for adjusted_data1.")
+  }
+} else {
+  print("No data in adjusted_data.")
+}
+
 ```
 
 ```{r}
@@ -92,45 +108,41 @@ adjusted_data <- adjusted_data %>%
 ```
 
 ```{r, warning=FALSE}
-loglik <- function(x, a.abias, na.abias, a.ebias, na.ebias, a.obias, na.obias, e.abias, ne.abias, e.ebias, ne.ebias, e.obias, ne.obias, o.abias, no.abias, o.ebias, no.ebias, o.obias, no.obias)
-{ # x is a vector containing the parameter values
-  ps.obias = x[1]  # pb.n is the first entry of x
-  ps.abias = x[2] # pb.bbias is the second entry of x
-  ps.ebias = x[3] # pb.gbias is the third entry of x'
-  
-  loglik = a.abias*log(ps.abias)+na.abias*log(1-ps.abias) + 
-    e.abias*log(ps.abias) + ne.abias*log(1-ps.abias) + 
-    o.abias*log(ps.abias) + no.abias*log(1-ps.abias) + 
-    a.ebias*log(ps.ebias)+na.ebias*log(1-ps.ebias) + 
-    e.ebias*log(ps.ebias) + ne.ebias*log(1-ps.ebias) + 
-    o.ebias*log(ps.ebias) + no.ebias*log(1-ps.ebias) + 
-    a.obias*log(ps.obias)+na.obias*log(1-ps.obias) + 
-    e.obias*log(ps.obias) + ne.abias*log(1-ps.obias) + 
-    o.obias*log(ps.obias) + no.ebias*log(1-ps.obias)
-  
-  return(-loglik) # optim is a minimization function (so need to give is negative log likelihood)
+loglik <- function(x, a.abias, na.abias, e.abias, ne.abias, o.abias, no.abias, a.ebias, na.ebias, e.ebias, ne.ebias, o.ebias, no.ebias, a.obias, na.obias, e.obias, ne.obias, o.obias, no.obias) {
+  ps.obias = x[1]  
+  ps.abias = x[2]
+  ps.ebias = x[3]
+
+  loglik = a.abias * log(ps.abias) + na.abias * log(1 - ps.abias) +
+    e.abias * log(ps.ebias) + ne.abias * log(1 - ps.ebias) +
+    o.abias * log(ps.obias) + no.abias * log(1 - ps.obias)
+
+  return(-loglik)
 }
+#adjusted_data1 <- adjusted_data %>% group_by()
+  
+
 
 optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
       loglik,
-      a.abias = (adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "ace"))$n,
-      na.abias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "ace"))$n),
-      e.abias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "ace"))$n),
-      ne.abias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "ace"))$n),
-      no.abias = sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "ace"))$n),
-      o.abias = sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "ace"))$n),
-      a.ebias = sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "error"))$n),
-      na.ebias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "error"))$n),
-      e.ebias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "error"))$n),
-      ne.ebias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "error"))$n),
-      o.ebias = sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "error"))$n),
-      no.ebias = sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "error"))$n),
-      a.obias = sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "other"))$n),
-      na.obias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "other"))$n),
-      e.obias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "other"))$n),
-      ne.obias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "other"))$n),
-      o.obias = sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "other"))$n),
-      no.obias = sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "other"))$n),
+      a.abias = (adjusted_data1 %>% filter(point_scored == "ace" & prev_point_scored == "ace"))$n,
+      na.abias = sum((adjusted_data1 %>% filter(point_scored != "ace" & prev_point_scored == "ace"))$n),
+      e.abias = sum((adjusted_data1 %>% filter(point_scored == "error" & prev_point_scored == "ace"))$n),
+      ne.abias = sum((adjusted_data1 %>% filter(point_scored != "error" & prev_point_scored == "ace"))$n),
+      no.abias = sum((adjusted_data1 %>% filter(point_scored != "other" & prev_point_scored == "ace"))$n),
+      o.abias = sum((adjusted_data1 %>% filter(point_scored == "other" & prev_point_scored == "ace"))$n),
+      a.ebias = sum((adjusted_data1 %>% filter(point_scored == "ace" & prev_point_scored == "error"))$n),
+      na.ebias = sum((adjusted_data1 %>% filter(point_scored != "ace" & prev_point_scored == "error"))$n),
+      e.ebias = sum((adjusted_data1 %>% filter(point_scored == "error" & prev_point_scored == "error"))$n),
+      ne.ebias = sum((adjusted_data1 %>% filter(point_scored != "error" & prev_point_scored == "error"))$n),
+      o.ebias = sum((adjusted_data1 %>% filter(point_scored == "other" & prev_point_scored == "error"))$n),
+      no.ebias = sum((adjusted_data1 %>% filter(point_scored != "other" & prev_point_scored == "error"))$n),
+      a.obias = sum((adjusted_data1 %>% filter(point_scored == "ace" & prev_point_scored == "other"))$n),
+      na.obias = sum((adjusted_data1 %>% filter(point_scored != "ace" & prev_point_scored == "other"))$n),
+      e.obias = sum((adjusted_data1 %>% filter(point_scored == "error" & prev_point_scored == "other"))$n),
+      ne.obias = sum((adjusted_data1 %>% filter(point_scored != "error" & prev_point_scored == "other"))$n),
+      o.obias = sum((adjusted_data1 %>% filter(point_scored == "other" & prev_point_scored == "other"))$n),
+      no.obias = sum((adjusted_data1 %>% filter(point_scored != "other" & prev_point_scored == "other"))$n),
       method="BFGS")
 
 ```
