@@ -4,76 +4,68 @@ format: html
 editor: visual
 ---
 
+Ho: Error term not necessary in the model
+Ha: Having an error term improves the model  
+
 ```{r}
-# Extract the estimated parameters
-estimated_params <- coef(result)
+# Log-likelihood for Model 1 (Three parameters: ace, error, other)
+loglik_model1 <- result$value
 
-# Calculate the z-value
-z_value <- (estimated_params[2] - 0.5) / standard_errors[2]
+# Log-likelihood for Model 2 (Two parameters: ace, other)
+loglik_model2 <- a$value
 
-# Calculate the two-tailed p-value
-p_value <- 2 * pnorm(-abs(z_value))
+# Degrees of freedom difference
+df_difference <- 6 - 4  # Model 1 has 6 parameters, Model 2 has 4 parameters
 
-# Set the significance level (e.g., 0.05)
-alpha <- 0.05
+# Likelihood ratio test statistic
+LR_statistic <- -2 * (loglik_model2 - loglik_model1)
 
-# Compare p-value to the significance level
-if (p_value < alpha) {
-  cat("Reject the null hypothesis. There is evidence that the bias for aces in the next point, given the previous point was an ace, is different from 0.5.")
+# p-value
+p_value <- pchisq(LR_statistic, df_difference, lower.tail = FALSE)
+
+# Conclusion
+if (p_value < 0.05) {
+  cat("Reject the null hypothesis. Model 1 (all point types) is significantly better.\n")
 } else {
-  cat("Fail to reject the null hypothesis. There is not enough evidence to suggest a difference in the bias for aces in the next point, given the previous point was an ace.")
+  cat("Fail to reject the null hypothesis. Model 2 (ace/other) is sufficient.\n")
 }
 
-# Print z-value and p-value
-cat("\nZ-value:", z_value, "\nP-value:", p_value)
+# Display test results
+cat("Likelihood Ratio Test Statistic:", LR_statistic, "\n")
+cat("Degrees of Freedom Difference:", df_difference, "\n")
+cat("p-value:", p_value, "\n")
 
 ```
 
+Ho: Ace term not necessary in the model 
+Ha: Having an ace term improves the model 
+
 ```{r}
+# Log-likelihood for full model
+loglik_model2 <- result$value
 
-# Ho: there is a significant difference between the two models
-# Ha: there is no significant difference in the two models
+# Log-likelihood for error model
+loglik_model3 <- e$value
 
-# Hypothesis testing between the models
-loglik0 <- -35979.94
-loglik1 <- -80497.31
+df_difference_2_3 <- 4 - 4  # Model 2 has 4 parameters, Model 3 has 4 parameters
 
-# Calculate the likelihood ratio statistic
-likelihood_ratio_stat <- -2 * (loglik0 - loglik1)
+# Likelihood ratio test statistic for Model 2 vs. Model 3
+LR_statistic_2_3 <- -2 * (loglik_model3 - loglik_model2)
 
+# p-value for Model 2 vs. Model 3
+p_value_2_3 <- pchisq(LR_statistic_2_3, df_difference_2_3, lower.tail = FALSE)
 
-df <- 0
-
-# Calculate the p-value using the chi-square distribution
-p_value <- pchisq(likelihood_ratio_stat, df, lower.tail = FALSE)
-
-x <- 0.05
-
-
-if (p_value < x) {
-  cat("Reject the null hypothesis. There is a significant difference between the two models.\n")
+# Conclusion for Model 2 vs. Model 3
+if (p_value_2_3 < 0.05) {
+  cat("Reject the null hypothesis. The full model is significantly better than error model.\n")
 } else {
-  cat("Fail to reject the null hypothesis. There is no significant difference between the two models.\n")
+  cat("Fail to reject the null hypothesis. Error model is sufficient.\n")
 }
 
+# Display test results for Model 2 vs. Model 3
+cat("Likelihood Ratio Test Statistic (Model 2 vs. Model 3):", LR_statistic_2_3, "\n")
+cat("Degrees of Freedom Difference (Model 2 vs. Model 3):", df_difference_2_3, "\n")
+cat("p-value (Model 2 vs. Model 3):", p_value_2_3, "\n")
+
 ```
 
-Neither the ace or error model is significantly better than the other.
-
-```{r}
-loglik <- as.double(80497)
-lr_test <- -2 * sum(loglik - logLik(null_model))  # Likelihood ratio statistic
-df <- length(mles)  # Degrees of freedom
-p_value <- pchisq(lr_test, df, lower.tail = FALSE)
-```
-
-```{r}
-# summary(mod4) |> names() # check names in summary object
-
-ts_lof <- summary(mod4)$deviance # lack of fit test statistic
-df_lof <- summary(mod4)$df.residual # df lack of fit test 
-
-pval_lof <- pchisq(ts_lof, df_lof, lower.tail = FALSE)
-
-pval_lof
-```

@@ -147,6 +147,19 @@ optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
 
 ```
 
+```{r}
+mod_all <- 4503*log(0.3333307)+13983*log(1-0.3333307) + 
+    6215*log(0.3333307) + 12226*log(1-0.3333307) + 
+    7723*log(0.3333307) + 10718*log(1-0.3333307) + 
+    5857*log(0.3333316)+45266*log(1-0.3333316) + 
+    19490*log(0.3333316) + 31633*log(1-0.3333316) + 
+    25776*log(0.3333316) + 25347*log(1-0.3333316) + 
+    8395*log(0.4142012)+62034*log(1-0.4142012) + 
+    26264*log(0.4142012) + 44165*log(1-0.4142012) + 
+    35770*log(0.4142012) + 34659*log(1-0.4142012)
+mod_all
+```
+
 ```{r, warning=FALSE}
 loglik <- function(x, a.abias, a.obias, na.abias, na.obias)
 { # x is a vector containing the parameter values

@@ -133,10 +133,10 @@ result <- optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
       method="BFGS")
 
 
-# Extract the estimated parameters
-estimated_params <- result
+result
 
 ```
+
 
 ```{r, warning=FALSE}
 loglik <- function(x, a.abias, a.obias, na.abias, na.obias)
@@ -155,12 +155,13 @@ adjusted_data2 <- adjusted_data %>%
     TRUE ~ prev_point_scored
   ))
 
-optim(par = c(.5,.5), 
+a <- optim(par = c(.5,.5), 
       loglik, a.abias = sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "ace"))$n),
       na.abias =sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "ace"))$n),
       a.obias = sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "other"))$n), na.obias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "other"))$n),
       method="BFGS")
 
+a
 
 ```
 
@@ -181,68 +182,13 @@ adjusted_data2 <- adjusted_data %>%
     TRUE ~ prev_point_scored
   ))
 
-a <- optim(par = c(.5, .5), 
+e <- optim(par = c(.5, .5), 
       loglik, e.ebias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "error"))$n),
       ne.ebias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "error"))$n),
       e.obias = sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "other"))$n),
       ne.obias = sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "other"))$n),
       method="BFGS")
 
+e
 ```
 
-```{r}
-# Hypothesis testing between the models
-# Assuming log-likelihood values for Model1 and Model2 are stored as loglik1 and loglik2
-loglik0 <- -35979.94
-loglik1 <- -80497.31
-
-# Calculate the likelihood ratio statistic
-likelihood_ratio_stat <- -2 * (loglik0 - loglik1)
-
-# Set the degrees of freedom (df) as the difference in the number of parameters between the two models
-df <- 0# Set the appropriate value based on the difference in parameters
-
-# Calculate the p-value using the chi-square distribution
-p_value <- pchisq(likelihood_ratio_stat, df, lower.tail = FALSE)
-
-# Set the significance level
-alpha <- 0.05
-
-# Compare p-value with significance level
-if (p_value < alpha) {
-  cat("Reject the null hypothesis. There is a significant difference between the two models.\n")
-} else {
-  cat("Fail to reject the null hypothesis. There is no significant difference between the two models.\n")
-}
-
-```
-
-```{r}
-# Hypothesis testing between the models
-# Assuming log-likelihood values for Model1 and Model2 are stored as loglik1 and loglik2
-loglik0 <- -35979.94
-loglik1 <- -80497.31
-
-# Calculate the likelihood ratio statistic
-likelihood_ratio_stat <- -2 * (loglik0 - loglik1)
-
-# Set the degrees of freedom (df) as the difference in the number of parameters between the two models
-df <- 0# Set the appropriate value based on the difference in parameters
-
-# Calculate the p-value using the chi-square distribution
-p_value <- pchisq(likelihood_ratio_stat, df, lower.tail = FALSE)
-
-# Set the significance level
-alpha <- 0.05
-
-# Compare p-value with significance level
-if (p_value < alpha) {
-  cat("Reject the null hypothesis. There is a significant difference between the two models.\n")
-} else {
-  cat("Fail to reject the null hypothesis. There is no significant difference between the two models.\n")
-}
-```
-
-```{r}
-
-```
