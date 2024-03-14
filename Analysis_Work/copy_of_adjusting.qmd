@@ -137,7 +137,6 @@ result
 
 ```
 
-
 ```{r, warning=FALSE}
 loglik <- function(x, a.abias, a.obias, na.abias, na.obias)
 { # x is a vector containing the parameter values
@@ -191,4 +190,3 @@ e <- optim(par = c(.5, .5),
 
 e
 ```
-

@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-Ho: Error term not necessary in the model
+Ho: Ace and other only in the model create a better model
 Ha: Having an error term improves the model  
 
 ```{r}
@@ -37,7 +37,7 @@ cat("p-value:", p_value, "\n")
 
 ```
 
-Ho: Ace term not necessary in the model 
+Ho: Looking only at error or other creates the better model 
 Ha: Having an ace term improves the model 
 
 ```{r}
@@ -47,7 +47,7 @@ loglik_model2 <- result$value
 # Log-likelihood for error model
 loglik_model3 <- e$value
 
-df_difference_2_3 <- 4 - 4  # Model 2 has 4 parameters, Model 3 has 4 parameters
+df_difference_2_3 <- 6 - 4  # Model 2 has 6 parameters, Model 3 has 4 parameters
 
 # Likelihood ratio test statistic for Model 2 vs. Model 3
 LR_statistic_2_3 <- -2 * (loglik_model3 - loglik_model2)
@@ -66,6 +66,39 @@ if (p_value_2_3 < 0.05) {
 cat("Likelihood Ratio Test Statistic (Model 2 vs. Model 3):", LR_statistic_2_3, "\n")
 cat("Degrees of Freedom Difference (Model 2 vs. Model 3):", df_difference_2_3, "\n")
 cat("p-value (Model 2 vs. Model 3):", p_value_2_3, "\n")
+
+```
+
+Null Hypothesis (Ho): Ace Model and error model are both equally good models.
+Alternative Hypothesis (Ha): Error Model is better than the Ace Model.
+
+```{r}
+# Calculate log likelihood for Ace Model (Model 2)
+loglik_model2 <- -a$value
+
+# Calculate log likelihood for Error Model (Model 3)
+loglik_model3 <- -e$value
+
+# Calculate likelihood ratio test statistic
+LR_statistic <- -2 * (loglik_model3 - loglik_model2)
+
+# Degrees of freedom for the models (difference in number of parameters)
+df_difference <- (3 - 2) - (3 - 2)  # Difference in degrees of freedom between Error Model and Ace Model
+
+# Compute p-value using chi-square distribution
+p_value <- pchisq(LR_statistic, df_difference, lower.tail = FALSE)
+
+# Print results
+cat("Likelihood ratio test statistic for Error Model vs. Ace Model:", LR_statistic, "\n")
+cat("Degrees of Freedom Difference:", df_difference, "\n")
+cat("P-value for Error Model vs. Ace Model:", p_value, "\n")
+
+
+if (p_value < 0.05) {
+  cat("Reject the null hypothesis. The Error Model provides a significantly better fit to the data than the Ace Model.\n")
+} else {
+  cat("Fail to reject the null hypothesis. There is insufficient evidence to conclude that the Error Model provides a better fit than the Ace Model.\n")
+}
 
 ```
 
