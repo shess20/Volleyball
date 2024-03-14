@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-Ho: Ace and other only in the model create a better model
+Ho: Ace and other only in the model create a better model than full
 Ha: Having an error term improves the model  
 
 ```{r}
@@ -83,7 +83,7 @@ loglik_model3 <- -e$value
 LR_statistic <- -2 * (loglik_model3 - loglik_model2)
 
 # Degrees of freedom for the models (difference in number of parameters)
-df_difference <- (3 - 2) - (3 - 2)  # Difference in degrees of freedom between Error Model and Ace Model
+df_difference <- 0  # Both models have the same number of parameters
 
 # Compute p-value using chi-square distribution
 p_value <- pchisq(LR_statistic, df_difference, lower.tail = FALSE)
@@ -93,11 +93,11 @@ cat("Likelihood ratio test statistic for Error Model vs. Ace Model:", LR_statist
 cat("Degrees of Freedom Difference:", df_difference, "\n")
 cat("P-value for Error Model vs. Ace Model:", p_value, "\n")
 
-
+# Interpretation
 if (p_value < 0.05) {
-  cat("Reject the null hypothesis. The Error Model provides a significantly better fit to the data than the Ace Model.\n")
+  cat("Reject the null hypothesis. There is evidence to suggest that the Error Model provides a significantly better fit to the data compared to the Ace Model.\n")
 } else {
-  cat("Fail to reject the null hypothesis. There is insufficient evidence to conclude that the Error Model provides a better fit than the Ace Model.\n")
+  cat("Fail to reject the null hypothesis. There is no sufficient evidence to conclude that the Error Model is superior to the Ace Model in explaining the observed data patterns.\n")
 }
 
 ```
