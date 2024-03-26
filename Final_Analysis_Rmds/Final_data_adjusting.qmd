@@ -189,26 +189,3 @@ e <- optim(par = c(.5, .5),
 
 e
 ```
-```{r}
-# Define the log-likelihood function for the independent model
-loglik_independent <- function(x, ace_abias, not_ace_abias) {
-  ps_ace = x[1]  # Probability of an ace event
-  loglik = ace_abias * log(ps_ace) + not_ace_abias * log(1 - ps_ace)
-  return(-loglik)  # Return negative log-likelihood for optimization
-}
-
-# Fit the independent model using optim
-independent_model <- optim(par = 0.5,  # Initial guess for the probability of an ace event
-                            loglik_independent,
-                            ace_abias = sum((adjusted_data %>% filter(point_scored == "ace"))$n),
-                            not_ace_abias = sum((adjusted_data %>% filter(point_scored != "ace"))$n),
-                            method = "BFGS")
-
-# Calculate the log-likelihood for the independent model
-loglik_independent_model <- -independent_model$value
-
-# Print the result
-cat("Log-likelihood for the independent model:", loglik_independent_model, "\n")
-
-```
-
