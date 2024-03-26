@@ -100,22 +100,23 @@ if (p_value < 0.05) {
 }
 
 ```
-Ho: the independent model is sufficient
 
-Ha: the full model is significantly better than the independent model
+Ho: the independent model is sufficient (for full model)
+
+Ha: the full model is significantly better than the independent model (for full model)
 
 ```{r}
 # Log-likelihood for the full model (Model 1)
-loglik_full_model <- -result$value  # Negate the result since your function returns negative log-likelihood
+loglik_full_model<- -result$value  # Negate the result since your function returns negative log-likelihood
 
 # Log-likelihood for the independent model
-loglik_independent_model <- -independent_model$value  # Negate the result since your function returns negative log-likelihood
+loglik_independent_model_full <- -independent_model_full$value  # Negate the result since your function returns negative log-likelihood
 
 # Degrees of freedom difference (difference in the number of parameters)
 df_difference <- 1  # Independent model has 1 parameter (probability of an ace event)
 
 # Likelihood ratio test statistic
-LR_statistic <- 2 * (loglik_full_model - loglik_independent_model)
+LR_statistic <- 2 * (loglik_full_model - loglik_independent_model_full)
 
 # p-value
 p_value <- pchisq(LR_statistic, df_difference, lower.tail = FALSE)
