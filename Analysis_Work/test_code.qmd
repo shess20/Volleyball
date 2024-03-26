@@ -4,8 +4,7 @@ format: html
 editor: visual
 ---
 
-Ho: Ace and other only in the model create a better model than full
-Ha: Having an error term improves the model  
+Ho: Ace and other only in the model create a better model than full Ha: Having an error term improves the model
 
 ```{r}
 # Log-likelihood for Model 1 (Three parameters: ace, error, other)
@@ -37,8 +36,7 @@ cat("p-value:", p_value, "\n")
 
 ```
 
-Ho: Looking only at error or other creates the better model 
-Ha: Having an ace term improves the model 
+Ho: Looking only at error or other creates the better model Ha: Having an ace term improves the model
 
 ```{r}
 # Log-likelihood for full model
@@ -69,8 +67,7 @@ cat("p-value (Model 2 vs. Model 3):", p_value_2_3, "\n")
 
 ```
 
-Null Hypothesis (Ho): Ace Model and error model are both equally good models.
-Alternative Hypothesis (Ha): Error Model is better than the Ace Model.
+Null Hypothesis (Ho): Ace Model and error model are both equally good models. Alternative Hypothesis (Ha): Error Model is better than the Ace Model.
 
 ```{r}
 # Calculate log likelihood for Ace Model (Model 2)
@@ -101,8 +98,11 @@ if (p_value < 0.05) {
 }
 
 ```
-Ho: the independent model is sufficent
-Ha: the full model is significantly better than the independent model 
+
+Ho: the independent model is sufficient
+
+Ha: the full model is significantly better than the independent model
+
 ```{r}
 # Log-likelihood for the full model (Model 1)
 loglik_full_model <- -result$value  # Negate the result since your function returns negative log-likelihood
@@ -131,4 +131,3 @@ if (p_value < 0.05) {
   cat("Fail to reject the null hypothesis. The independent model is sufficient.\n")
 }
 ```
-
