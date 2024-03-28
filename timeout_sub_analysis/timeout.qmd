@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "timeout"
 format: html
 editor: visual
 ---
@@ -16,6 +16,36 @@ boxscores <-  read.csv("data/boxscoresFINAL.csv")
 perSet <- read.csv("data/per_set_statsNew.csv")
 ```
 
+
+
+```{r}
+calculate_timeout_probability <- function(playByPlay) {
+  plays <- playByPlay %>%
+    mutate(
+      prev_home_score = lag(home_team_score, default = first(home_team_score)),
+      prev_visiting_score = lag(visiting_team_score, default = first(visiting_team_score)),
+      next_home_score = lead(home_team_score, default = first(home_team_score)),
+      next_visiting_score = lead(visiting_team_score, default = first(visiting_team_score)),
+      losing_team = ifelse(prev_home_score < prev_visiting_score, "home", "visiting"),
+      losing_team_next_score = ifelse(losing_team == "home", next_home_score, next_visiting_score),
+      losing_team_increases_score = ifelse(losing_team_next_score - 
+                                            ifelse(losing_team == "home", prev_home_score, prev_visiting_score) == 1,
+                                          TRUE, FALSE)
+    )
+
+  losing_team_next_point_count <- sum(plays$losing_team_increases_score & timeout$timeout, na.rm = TRUE)
+
+  total_timeouts <- sum(timeout$timeout, na.rm = TRUE)
+
+  probability <- losing_team_next_point_count / total_timeouts
+  
+  return(probability)
+}
+
+
+probability <- calculate_timeout_probability(playByPlay)
+print(paste("Probability of the losing team scoring one point after a timeout:", probability))
+```
 
 
 ```{r}
@@ -70,8 +100,7 @@ timeout <- playByPlay %>%
          prev_visiting_score = lag(visiting_team_score, default = first(visiting_team_score)),
          next_home_score = lead(home_team_score, default = first(home_team_score)),
          next_visiting_score = lead(visiting_team_score, default = first(visiting_team_score))
-         )
-timeout <- timeout %>% 
+         ) %>% 
   filter(timeout == TRUE)
 
 calculate_timeout_probability <- function(playByPlay) {
@@ -104,7 +133,30 @@ print(paste("Probability of the losing team scoring one point after a timeout:",
 
 ```
 ```{r}
-# Select only the last row per set
+library(dplyr)
+
+timeout <- playByPlay %>%
+  mutate(
+    timeout = grepl("Timeout", play_descripton, ignore.case = TRUE),
+    prev_home_score = lag(home_team_score, default = first(home_team_score)),
+    prev_visiting_score = lag(visiting_team_score, default = first(visiting_team_score)),
+    next_home_score = lead(home_team_score, default = first(home_team_score)),
+    next_visiting_score = lead(visiting_team_score, default = first(visiting_team_score))
+  ) %>%
+  filter(timeout == TRUE) %>%
+  group_by(set, Date, Site) %>%
+  arrange(set) %>%
+  filter(row_number() == n()-1)
+
+
+```
+
+```{r}
+
+playByPlay <- read.csv("data/play_by_playFINAL3.csv")
+
+playByPlay <- playByPlay %>% 
+  group_by(Date, set, Site)
 
 calculate_timeout_probability_last_per_set <- function(playByPlay) {
   timeout <- playByPlay %>%
@@ -119,24 +171,53 @@ calculate_timeout_probability_last_per_set <- function(playByPlay) {
       losing_team_increases_score = ifelse(losing_team_next_score - 
                                             ifelse(losing_team == "home", prev_home_score, prev_visiting_score) == 1,
                                           TRUE, FALSE)
+    ) %>%
+    filter(timeout == TRUE) %>%
+    summarise(
+      losing_team_next_point_count = sum(losing_team_increases_score, na.rm = TRUE),
+      total_timeouts = sum(timeout, na.rm = TRUE)
     )
-  timeout <- timeout %>%
-    group_by(set, Date, Site) %>%
-    filter(row_number() == n()-1)
   
-  losing_team_next_point_count <- sum(timeout$losing_team_increases_score & timeout$timeout, na.rm = TRUE)
-
-  total_timeouts <- sum(timeout$timeout, na.rm = TRUE)
-
-  probability <- losing_team_next_point_count / total_timeouts
+  probability <- timeout$losing_team_next_point_count / timeout$total_timeouts
   
   return(probability)
 }
 
-
-probability <- calculate_timeout_probability_last_per_set(playByPlay)
+probability <- sum(calculate_timeout_probability_last_per_set(playByPlay)) / 1782
 print(paste("Probability of the losing team scoring one point after last timeout of the set:", probability))
 
-
 ```
+
+```{r}
+library(dplyr)
+
+calculate_win_probability <- function(playByPlay) {
+  timeout <- playByPlay %>%
+    mutate(
+      timeout = grepl("Timeout", play_descripton, ignore.case = TRUE), 
+      prev_home_score = lag(home_team_score, default = first(home_team_score)),
+      prev_visiting_score = lag(visiting_team_score, default = first(visiting_team_score)),
+      next_home_score = lead(home_team_score, default = last(home_team_score)),
+      next_visiting_score = lead(visiting_team_score, default = last(visiting_team_score)),
+      losing_team = ifelse(prev_home_score < prev_visiting_score, "home", "visiting"),
+      losing_team_next_score = ifelse(losing_team == "home", next_home_score, next_visiting_score),
+      losing_team_wins = ifelse(losing_team_next_score > ifelse(losing_team == "home", last(visiting_team_score), last(home_team_score)), TRUE, FALSE)
+    )
+  
+  last_timeout <- timeout %>% filter(timeout == TRUE) %>% slice(n())
+  
+  losing_team_wins_after_last_timeout <- sum(last_timeout$losing_team_wins, na.rm = TRUE)
+  total_timeouts <- sum(timeout$timeout, na.rm = TRUE)
+
+  probability <- losing_team_wins_after_last_timeout / total_timeouts
+  
+  return(probability)
+}
+
+# Example usage:
+# Assuming playByPlay is your dataset
+probability <- calculate_win_probability(playByPlay)
+print(paste("Probability of the losing team winning after the last timeout:", probability))
+```
+
 
