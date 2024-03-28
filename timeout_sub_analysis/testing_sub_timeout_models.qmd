@@ -1,0 +1,70 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+
+Ho: model without timeout and subs is sufficent 
+Ha: the model with timeout and subs is better 
+```{r}
+# Log-likelihood for the full model (Model 1)
+loglik_full_model_subs<- -result_full_with_timeout_and_sub$value  # Negate the result since your function returns negative log-likelihood
+
+# Log-likelihood for the independent model
+loglik_model_full <- -result$value  # Negate the result since your function returns negative log-likelihood
+
+# Degrees of freedom difference (difference in the number of parameters)
+df_difference <- 1  # Independent model has 1 parameter (probability of an ace event)
+
+# Likelihood ratio test statistic
+LR_statistic <- 2 * (loglik_full_model_subs - loglik_model_full)
+
+# p-value
+p_value <- pchisq(LR_statistic, df_difference, lower.tail = FALSE)
+
+# Print the results
+cat("Likelihood Ratio Test Statistic (Full Model vs. Independent Model):", LR_statistic, "\n")
+cat("Degrees of Freedom Difference:", df_difference, "\n")
+cat("p-value:", p_value, "\n")
+
+# Conclusion
+if (p_value < 0.05) {
+  cat("Reject the null hypothesis. The model with subs and timeouts is signifficantly better.\n")
+} else {
+  cat("Fail to reject the null hypothesis. The model without timeouts and subs is sufficient.\n")
+}
+```
+
+Ho: independent model is sufficient 
+Ha: the full model is significantly better than the independent model 
+```{r}
+# Log-likelihood for the full model (Model 1)
+loglik_full_model<- -result_full_with_timeout_and_sub$value  # Negate the result since your function returns negative log-likelihood
+
+# Log-likelihood for the independent model
+loglik_independent_model_full <- -result_independent_full$value  # Negate the result since your function returns negative log-likelihood
+
+# Degrees of freedom difference (difference in the number of parameters)
+df_difference <- 1  # Independent model has 1 parameter (probability of an ace event)
+
+# Likelihood ratio test statistic
+LR_statistic <- 2 * (loglik_full_model - loglik_independent_model_full)
+
+# p-value
+p_value <- pchisq(LR_statistic, df_difference, lower.tail = FALSE)
+
+# Print the results
+cat("Likelihood Ratio Test Statistic (Full Model vs. Independent Model):", LR_statistic, "\n")
+cat("Degrees of Freedom Difference:", df_difference, "\n")
+cat("p-value:", p_value, "\n")
+
+# Conclusion
+if (p_value < 0.05) {
+  cat("Reject the null hypothesis. The full model is significantly better than the independent model.\n")
+} else {
+  cat("Fail to reject the null hypothesis. The independent model is sufficient.\n")
+}
+```
+
+

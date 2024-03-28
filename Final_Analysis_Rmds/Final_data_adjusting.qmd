@@ -238,6 +238,50 @@ cat("Log-likelihood for the independent model:", loglik_independent_model_error,
 
 ```
 
+\# Define the log-likelihood function for the independent model
+
+loglik_independent_full\<- function(x, e_ebias, ne_ebias, a_abias, na_abias, o_obias, no_obias) {
+
+ps_error = x\[1\]
+
+ps_ace = x\[2\] \# Probability of an ace event
+
+ps_other = x\[3\]
+
+loglik = e_ebias \* log(ps_error) + ne_ebias \* log(1 - ps_error) +a_abias \* log(ps_ace) + na_abias \* log(1 - ps_ace) + o_obias \* log(ps_other) + no_obias \* log(1 - ps_other)
+
+return(-loglik) \# Return negative log-likelihood for optimization
+
+}
+
+\# Fit the independent model using optim
+
+independent_model_full \<- optim(par = c(.5, .5, 0.5), \# Initial guess for the probability of an ace event
+
+loglik_independent_full,
+
+a_abias = sum((adjusted_data %\>% filter(point_scored == "ace"))\$n),
+
+na_abias = sum((adjusted_data %\>% filter(point_scored != "ace"))\$n),
+
+e_ebias = sum((adjusted_data %\>% filter(point_scored == "error"))\$n),
+
+ne_ebias = sum((adjusted_data %\>% filter(point_scored != "error"))\$n),
+
+o_obias = sum((adjusted_data %\>% filter(point_scored == "other"))\$n),
+
+no_obias = sum((adjusted_data %\>% filter(point_scored != "other"))\$n),
+
+method = "BFGS")
+
+\# Calculate the log-likelihood for the independent model
+
+loglik_independent_model_full \<- -independent_model_full\$value
+
+\# Print the result
+
+cat("Log-likelihood for the independent model:", loglik_independent_model_full, "\\n")
+
 ```{r}
 
 # Define the log-likelihood function for the independent model
@@ -267,4 +311,3 @@ loglik_independent_model_full <- -independent_model_full$value
 cat("Log-likelihood for the independent model:", loglik_independent_model_full, "\n")
 
 ```
-

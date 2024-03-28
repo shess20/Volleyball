@@ -101,21 +101,30 @@ loglik <- function(x, a.abias, na.abias, a.ebias, na.ebias, a.obias, na.obias, e
   ps.obias = x[1]  # pb.n is the first entry of x
   ps.abias = x[2] # pb.bbias is the second entry of x
   ps.ebias = x[3] # pb.gbias is the third entry of x'
+  ps.sbias = x[4]
+  ps.tbias = x[5]
   
-  loglik = a.abias*log(ps.abias)+na.abias*log(1-ps.abias) + 
+  loglik =
+    a.abias*log(ps.abias) + na.abias*log(1-ps.abias) + 
     e.abias*log(ps.abias) + ne.abias*log(1-ps.abias) +  
     o.abias*log(ps.abias) + no.abias*log(1-ps.abias) + 
-    a.ebias*log(ps.ebias)+na.ebias*log(1-ps.ebias) + 
+    a.ebias*log(ps.ebias) + na.ebias*log(1-ps.ebias) + 
     e.ebias*log(ps.ebias) + ne.ebias*log(1-ps.ebias) + 
     o.ebias*log(ps.ebias) + no.ebias*log(1-ps.ebias) + 
-    a.obias*log(ps.obias)+na.obias*log(1-ps.obias) + 
-    e.obias*log(ps.obias) + ne.abias*log(1-ps.obias) + 
-    o.obias*log(ps.obias) + no.ebias*log(1-ps.obias)
+    a.obias*log(ps.obias) + na.obias*log(1-ps.obias) + 
+    e.obias*log(ps.obias) + ne.obias*log(1-ps.obias) + 
+    o.obias*log(ps.obias) + no.obias*log(1-ps.obias) + 
+    a.sbias*log(ps.sbias) + na.sbias*log(1-ps.sbias) + 
+    e.sbias*log(ps.sbias) + ne.sbias*log(1-ps.sbias) + 
+    o.sbias*log(ps.sbias) + no.sbias*log(1-ps.sbias) + 
+    a.tbias*log(ps.tbias) + na.tbias*log(1-ps.tbias) + 
+    e.tbias*log(ps.tbias) + ne.tbias*log(1-ps.tbias) + 
+    o.tbias*log(ps.tbias) + no.tbias*log(1-ps.tbias)
   
   return(-loglik) # optim is a minimization function (so need to give is negative log likelihood)
 }
 
-result_full_with_timeout_and_sub <- optim(par = c(.5,.5,.5), # equally likely to be boy girl or neutral
+result_full_with_timeout_and_sub <- optim(par = c(.5,.5,.5,.5,.5), # equally likely to be boy girl or neutral
       loglik,
       a.abias = sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "ace"))$n),
       na.abias = sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "ace"))$n),
@@ -152,4 +161,64 @@ result_full_with_timeout_and_sub <- optim(par = c(.5,.5,.5), # equally likely to
 
 result_full_with_timeout_and_sub
 
+```
+
+
+```{r}
+loglik_independent_full <- function(x, p_bias) {
+  # Ensure x is within the valid range (0 to 1)
+  x <- pmax(pmin(x, 0.999999), 0.000001)
+  
+  # Calculate the log-likelihood
+  loglik = sum(p_bias * log(x) + (1 - p_bias) * log(1 - x))
+  
+  # Check for non-finite values
+  if (any(!is.finite(loglik))) {
+    return(NA)  # Return NA if non-finite values are encountered
+  }
+  
+  return(-loglik)
+}
+
+
+p_bias <- c(
+  sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "ace"))$n),
+  sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "ace"))$n),
+  sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "ace"))$n),
+  sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "ace"))$n),
+  sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "ace"))$n),
+  sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "ace"))$n),
+  sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "error"))$n),
+  sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "error"))$n),
+  sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "error"))$n),
+  sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "error"))$n),
+  sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "error"))$n),
+  sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "error"))$n),
+  sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "other"))$n),
+  sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "other"))$n),
+  sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "other"))$n),
+  sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "other"))$n),
+  sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "other"))$n),
+  sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "other"))$n),
+  sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "sub"))$n),
+  sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "sub"))$n),
+  sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "sub"))$n),
+  sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "sub"))$n),
+  sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "sub"))$n),
+  sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "sub"))$n),
+  sum((adjusted_data %>% filter(point_scored == "ace" & prev_point_scored == "timeout"))$n),
+  sum((adjusted_data %>% filter(point_scored != "ace" & prev_point_scored == "timeout"))$n),
+  sum((adjusted_data %>% filter(point_scored == "error" & prev_point_scored == "timeout"))$n),
+  sum((adjusted_data %>% filter(point_scored != "error" & prev_point_scored == "timeout"))$n),
+  sum((adjusted_data %>% filter(point_scored == "other" & prev_point_scored == "timeout"))$n),
+  sum((adjusted_data %>% filter(point_scored != "other" & prev_point_scored == "timeout"))$n)
+)
+
+result_independent_full <- optim(par = 0.5, # Initial guess for probability
+                             loglik_independent_full,
+                             p_bias = p_bias,
+                             method = "BFGS")
+
+# The optimized parameter value for the independent model
+result_independent_full$par
 ```
