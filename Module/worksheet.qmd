@@ -1,8 +1,9 @@
 ---
 title: "Worksheet" 
-format: html
-editor: docx
+format: docx
 ---
+
+# Analyzing Volleyball Point Data
 
 ```{r}
 library(readr)
@@ -15,3 +16,11 @@ playByPlay <- read.csv("data/play_by_playFINAL3.csv")
 boxscores <-  read.csv("data/boxscoresFINAL.csv")
 perSet <- read.csv("data/per_set_statsNew.csv")
 ```
+
+NCAA Division 3 Liberty League Volleyball Data was scraped for the 2013-2022 seasons.
+
+```{r}
+
+```
+
+
