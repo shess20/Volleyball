@@ -17,8 +17,48 @@ boxscores <-  read.csv("data/boxscoresFINAL.csv")
 perSet <- read.csv("data/per_set_statsNew.csv")
 ```
 
-NCAA Division 3 Liberty League Volleyball Data was scraped for the 2013-2022 seasons.
+### In volleyball, it is common for teams to call timeouts when they are losing a set. When we look at NCAA Division 3 Liberty League Volleyball Data for 2013-2022 seasons, we can see the effects of calling a timeout and weather or not calling a timeout led to a point or set win. This can be seen in the 
 
+```{r}
+library(knitr)
+library(kableExtra)
+timeout <- playByPlay %>%
+    mutate(
+      timeout = grepl("Timeout", play_descripton, ignore.case = TRUE), 
+      prev_home_score = lag(home_team_score, default = first(home_team_score)),
+      prev_visiting_score = lag(visiting_team_score, default = first(visiting_team_score)),
+      next_home_score = lead(home_team_score, default = first(home_team_score)),
+      next_visiting_score = lead(visiting_team_score, default = first(visiting_team_score)),
+      losing_team = ifelse(prev_home_score < prev_visiting_score, "home", "visiting"),
+      losing_team_next_score = ifelse(losing_team == "home", next_home_score, next_visiting_score),
+      losing_team_increases_score = ifelse(losing_team_next_score - 
+                                            ifelse(losing_team == "home", prev_home_score, prev_visiting_score) == 1,
+                                          TRUE, FALSE))
+timeout %>% select(prev_home_score, prev_visiting_score, next_home_score, next_visiting_score, losing_team, losing_team_next_score, losing_team_increases_score)
+
+table(head(timeout))
+
+# Display the first few rows of your data frame as a nice table
+kable(head(timeout), "html") %>%
+  kable_styling(full_width = FALSE)
+```
+
+### Also, even if you end up scoring after a timeout, you don't necessarilly win the set. By looking only at the last timeout of the set, you can tell weather or not the losing team before the timeout lost or won the set. 
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+data <- last_timeout %>% select(play_descripton, Site, set, losing_team, set_winner, losing_team_wins)
+
+# Display the first few rows of your data frame as a nice table
+kable(head(last_timeout), "html")%>%
+  kable_styling(full_width = FALSE)
+
+```
+
+
+### Also two possible ways to score a point in volleyball are on a serve error or to get an ace. 
 ```{r}
 
 ```

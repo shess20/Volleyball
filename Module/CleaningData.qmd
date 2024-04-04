@@ -1,0 +1,17 @@
+---
+title: "Cleaning_data_for_worksheet"
+format: html
+editor: visual
+---
+
+```{r}
+# write.csv(timeout, "timeout.csv", row.names = FALSE)
+# write.csv(last_timeout, "last_timeout.csv", row.names = FALSE)
+```
+
+```{r}
+library(DT)
+
+head(last_timeout %>% 
+       select(play_descripton, set_winner, losing_team, losing_team_wins))
+```

@@ -2,6 +2,8 @@
 title: "timeout"
 format: html
 editor: visual
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r}
@@ -166,7 +168,7 @@ playByPlay <- playByPlay %>%
     next_home_score = lead(home_team_score, default = last(home_team_score)),
     next_visiting_score = lead(visiting_team_score, default = last(visiting_team_score)),
     losing_team = ifelse(prev_home_score < prev_visiting_score, "home", "visiting"),
-    losing_team_next_score = ifelse(losing_team == "home", next_home_score, next_visiting_score),
+    #losing_team_next_score = ifelse(losing_team == "home", next_home_score, next_visiting_score),
     set_winner = ifelse(last(home_team_score) > last(visiting_team_score), "home", "visiting"),
     losing_team_wins = ifelse(
       (losing_team == "home" & last(home_team_score) > last(visiting_team_score)) |
@@ -194,7 +196,8 @@ calculate_set_win_probability <- function(playByPlay) {
 probability <- calculate_set_win_probability(playByPlay)
 print(paste("Probability of the losing team winning the entire set after the last timeout:", probability))
 ```
-7% chance of losing team before last timeout winning set.
+7% chance of team losing before last timeout wins the set.
+
 
 
 
