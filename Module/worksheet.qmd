@@ -1,0 +1,17 @@
+---
+title: "Worksheet" 
+format: html
+editor: docx
+---
+
+```{r}
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(magrittr)
+
+# reading in Cassie's data
+playByPlay <- read.csv("data/play_by_playFINAL3.csv")
+boxscores <-  read.csv("data/boxscoresFINAL.csv")
+perSet <- read.csv("data/per_set_statsNew.csv")
+```
